@@ -2,10 +2,9 @@
 // The server still makes the final call when a booking is requested.
 import type { AvailabilityBlock } from './types/availability'
 
-// True if the night starting on `date` is blocked or booked.
-// Blocks end on their end_date (exclusive, like check-out), so end_date itself is free.
-export function isNightUnavailable(blocks: AvailabilityBlock[], date: string): boolean {
-  return blocks.some((b) => b.status !== 'available' && b.start_date <= date && date < b.end_date)
+// The blocked/booked block covering the night starting on `date`, or undefined if it's free.
+export function blockForNight(blocks: AvailabilityBlock[], date: string): AvailabilityBlock | undefined {
+  return blocks.find((b) => b.status !== 'available' && b.start_date <= date && date < b.end_date)
 }
 
 // True if any night of the stay (check-in up to, not including, check-out) is unavailable.

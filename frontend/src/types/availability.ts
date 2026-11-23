@@ -13,10 +13,29 @@ export type AvailabilityBlock = {
   updated_datetime: string
 }
 
-// --- Request body (Property Service, /properties/availability, read-only for now) ---
+// --- Request bodies (Property Service, /properties/availability) ---
+// One endpoint, three actions (team decision C1a). "get" is the default.
 
 export type GetAvailabilityRequest = {
+  action?: 'get'
   property_id: string
   start_date: string
   end_date: string
 }
+
+// Host closes a date range. Fails with 409 if any of those nights is already blocked or booked.
+export type BlockDatesRequest = {
+  action: 'block'
+  property_id: string
+  host_id: string // must own the listing
+  start_date: string
+  end_date: string // exclusive, like check-out
+}
+
+// Host reopens one of their own blocks (source "host"). Booking blocks can't be unblocked.
+export type UnblockDatesRequest = {
+  action: 'unblock'
+  availability_id: string
+  host_id: string
+}
+export type UnblockDatesResponse = { availability_id: string; unblocked: true }

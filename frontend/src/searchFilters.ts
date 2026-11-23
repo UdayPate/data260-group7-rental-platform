@@ -1,7 +1,14 @@
 // The guest search filters live in the page URL (e.g. /?location=San+Jose&guests=2),
 // so reload, the Back button and shared links all keep them. This file converts
 // between the URL, a filters object the UI works with, and the API request body.
-import { AMENITIES, PROPERTY_TYPES, type Amenity, type PropertyType, type SearchPropertiesRequest } from './types/property'
+import {
+  AMENITIES,
+  PROPERTY_TYPES,
+  type Amenity,
+  type PropertyStatus,
+  type PropertyType,
+  type SearchPropertiesRequest,
+} from './types/property'
 
 export type SearchFilters = {
   location: string // '' = any
@@ -18,6 +25,11 @@ export type SearchFilters = {
 
 // The "★ 4.5+" chip in the filter strip.
 export const RATING_CHIP_VALUE = 4.5
+
+// Adds the value if it's missing, removes it if it's there (for chip/checkbox lists).
+export function toggleIn<T>(list: T[], value: T): T[] {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
+}
 
 // Number from a URL value, or null if it's missing or not a number.
 function toNumber(value: string | null): number | null {
@@ -86,4 +98,29 @@ export function toSearchRequest(
     page,
     page_size: pageSize,
   }
+}
+
+// ---------- Host "My listings" filters (URL: /host/listings?location=...&types=...&status=active) ----------
+
+export type HostListingFilters = {
+  location: string // '' = any
+  types: PropertyType[]
+  status: PropertyStatus | null // null = active and inactive
+}
+
+export function readHostFilters(params: URLSearchParams): HostListingFilters {
+  const status = params.get('status')
+  return {
+    location: params.get('location') ?? '',
+    types: toList(params.get('types'), PROPERTY_TYPES),
+    status: status === 'active' || status === 'inactive' ? status : null,
+  }
+}
+
+export function writeHostFilters(filters: HostListingFilters): URLSearchParams {
+  const params = new URLSearchParams()
+  if (filters.location) params.set('location', filters.location)
+  if (filters.types.length > 0) params.set('types', filters.types.join(','))
+  if (filters.status) params.set('status', filters.status)
+  return params
 }

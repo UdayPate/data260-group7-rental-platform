@@ -62,9 +62,10 @@ export type GetPropertyRequest = {
   guest_id?: string // fills is_saved for this guest
 }
 
-export type UpdatePropertyRequest = { property_id: string } & Partial<CreatePropertyRequest>
+// host_id = the host making the change (must own the listing, else 403). The owner can't be changed.
+export type UpdatePropertyRequest = { property_id: string; host_id: string } & Partial<Omit<CreatePropertyRequest, 'host_id'>>
 
-export type DeletePropertyRequest = { property_id: string }
+export type DeletePropertyRequest = { property_id: string; host_id: string }
 export type DeletePropertyResponse = { property_id: string; deleted: true }
 
 // Every filter is optional; only page and page_size are required.
@@ -81,6 +82,7 @@ export type SearchPropertiesRequest = {
   available_only?: boolean // needs check_in and check_out
   guest_id?: string // fills is_saved for this guest
   host_id?: string // only this host's listings (host "my listings" page)
+  status?: PropertyStatus // only listings with this status (mainly for host_id searches)
   page: number
   page_size: number
 }

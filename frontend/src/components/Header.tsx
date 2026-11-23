@@ -1,6 +1,7 @@
 import { Link, NavLink, useLocation, useNavigate } from 'react-router'
 import { mocksEnabled } from '../config'
 import FilterStrip from './FilterStrip'
+import HostFilterStrip from './HostFilterStrip'
 import SearchBar from './SearchBar'
 import UserPicker from './UserPicker'
 
@@ -23,7 +24,7 @@ const hostNav: NavItem[] = [
 ]
 
 // Layout (team decision): row 1 = logo, nav, badge, picker, toggle;
-// row 2 = search bar (guest mode); then the cream filter strip (search page only).
+// row 2 = search bar (guest mode); then the cream filter strip (search page, and host "My listings").
 function Header() {
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
@@ -96,6 +97,8 @@ function Header() {
       )}
 
       {onSearchPage && <FilterStrip />}
+      {/* Host "My listings" gets its own strip (listing filters). key = reset its text box when the URL changes. */}
+      {pathname === '/host/listings' && <HostFilterStrip key={search} />}
     </header>
   )
 }

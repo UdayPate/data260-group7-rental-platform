@@ -240,11 +240,11 @@ Non-paged lists use `{ "items": [ ... ] }`.
 |---|---|---|
 | `POST /properties/create` | Property **without** `property_id`, `rating`, `review_count`, `created_datetime`. Required: `host_id`, `title`, `property_type`, `address`, `city`, `state`, `zip_code`, `capacity`, `bedrooms`, `bathrooms`, `nightly_price`, `cleaning_fee` | `201` Property |
 | `POST /properties/get` | `{ "property_id", "guest_id"? }` | Property plus `"is_saved"` (same meaning as in search: `true` if `guest_id` saved it, `false` otherwise or when no `guest_id` is sent). Inactive listings are returned too. |
-| `POST /properties/update` | `{ "property_id", ...only the fields being changed }` | updated Property |
-| `POST /properties/delete` | `{ "property_id" }` | `{ "property_id", "deleted": true }`. Returns `409 INVALID_STATUS` if the listing still has upcoming pending or approved reservations. |
+| `POST /properties/update` | `{ "property_id", "host_id", ...only the fields being changed }`. `host_id` is the **acting host** and must own the listing (else `403`); the owner can't be changed. | updated Property |
+| `POST /properties/delete` | `{ "property_id", "host_id" }`. `host_id` must own the listing (else `403`). | `{ "property_id", "deleted": true }`. Returns `409 INVALID_STATUS` if the listing still has upcoming pending or approved reservations (`details.reservation_ids` lists them). |
 | `POST /properties/search` | see below | paged PropertySearchResult |
 | `POST /properties/save` | see below | see below |
-| `POST /properties/availability` | `{ "property_id", "start_date", "end_date" }` | `{ "items": AvailabilityBlock[] }` = every block overlapping the range. **Read-only for now**; writing blocks will be added with the host availability page. |
+| `POST /properties/availability` | One endpoint with an `action` (default `"get"`), see below | see below |
 
 #### `POST /properties/search`
 
@@ -281,6 +281,7 @@ Request (every filter is optional; `page` and `page_size` are required):
 | available_only | needs check_in/check_out (else `400`); excludes properties with any non-`available` block overlapping the stay |
 | guest_id | doesn't filter; fills `is_saved` for this guest |
 | host_id | only this host's listings, **including inactive ones** (for the host's "My listings" page). Without it, only `active` listings are returned. |
+| status | `"active"` or `"inactive"`: only listings with that status (used with `host_id`; without `host_id` only active listings exist in the results anyway) |
 
 Results are in `property_id` order. Each item is a Property plus one extra field:
 
@@ -302,6 +303,28 @@ Response:
 ```json
 { "property_id": "p_005", "saved": true, "saved_properties_count": 4 }
 ```
+
+#### `POST /properties/availability`
+
+One endpoint, three actions:
+
+| `action` | Request body | Response |
+|---|---|---|
+| `"get"` (or left out) | `{ "property_id", "start_date", "end_date" }` | `{ "items": AvailabilityBlock[] }` = every block overlapping the range |
+| `"block"` | `{ "action": "block", "property_id", "host_id", "start_date", "end_date" }` | `201` the new AvailabilityBlock (`status: "blocked"`, `source: "host"`) |
+| `"unblock"` | `{ "action": "unblock", "availability_id", "host_id" }` | `{ "availability_id", "unblocked": true }` |
+
+**Availability rules (spec §13.3, team decision):**
+1. `host_id` must own the listing, else `403 UNAUTHORIZED`.
+2. A new block may **not overlap any blocked or booked night** (from another host block or a
+   reservation): `409 DATE_CONFLICT`, with `details.availability_id` = the block it clashed with.
+   No merging. The first write wins, and the second gets the 409 and must pick other dates. This must
+   be enforced atomically in the database (same as double booking), so two hosts or services
+   writing at the same moment can't both succeed.
+3. Blocks can't start in the past (`400`); `end_date` must be after `start_date` (`400`).
+4. Only blocks with `source: "host"` can be unblocked. Booking blocks return
+   `409 INVALID_STATUS`; free those nights by declining or cancelling the reservation.
+5. A guest's booking request that overlaps a host block gets `409 DATE_CONFLICT` (booking rule 2).
 
 ### Booking Service
 

@@ -6,6 +6,8 @@ import { db, hasDateConflict, holdsDates, nextId } from '../db'
 import { checkPaging, errorResponse, invalidJsonResponse, MOCK_DELAY_MS, paginate, readBody, requireFields } from '../responses'
 
 const propertyNotFound = (id: unknown) => errorResponse('NOT_FOUND', `No property found with id ${String(id)}.`)
+const notOwner = (action: string) =>
+  errorResponse('UNAUTHORIZED', `Only the host of this listing can ${action} it.`)
 
 const isPositiveNumber = (value: unknown) => typeof value === 'number' && value > 0
 const isWholeNumber = (value: unknown) => Number.isInteger(value) && (value as number) >= 0
@@ -104,14 +106,15 @@ export const propertyHandlers = [
     await delay(MOCK_DELAY_MS)
     const body = await readBody(request)
     if (!body) return invalidJsonResponse()
-    const missing = requireFields(body, ['property_id'])
+    const missing = requireFields(body, ['property_id', 'host_id'])
     if (missing) return missing
     const property = db.properties.find((p) => p.property_id === body.property_id)
     if (!property) return propertyNotFound(body.property_id)
+    if (property.host_id !== body.host_id) return notOwner('edit')
     const badField = checkPropertyFields(body)
     if (badField) return badField
 
-    // Everything except ids, rating, review_count and created time can change.
+    // Everything except ids, owner, rating, review_count and created time can change.
     const editable = [
       'title', 'description', 'property_type', 'address', 'city', 'state', 'zip_code', 'latitude', 'longitude',
       'capacity', 'bedrooms', 'bathrooms', 'amenities', 'nightly_price', 'cleaning_fee', 'status', 'photo_url',
@@ -126,10 +129,11 @@ export const propertyHandlers = [
     await delay(MOCK_DELAY_MS)
     const body = await readBody(request)
     if (!body) return invalidJsonResponse()
-    const missing = requireFields(body, ['property_id'])
+    const missing = requireFields(body, ['property_id', 'host_id'])
     if (missing) return missing
     const index = db.properties.findIndex((p) => p.property_id === body.property_id)
     if (index === -1) return propertyNotFound(body.property_id)
+    if (db.properties[index].host_id !== body.host_id) return notOwner('delete')
 
     // Can't delete a listing that still has upcoming pending/approved stays.
     const upcoming = db.reservations.filter(
@@ -185,11 +189,17 @@ export const propertyHandlers = [
     ) {
       return errorResponse('VALIDATION_ERROR', 'The minimum price can’t be higher than the maximum price.')
     }
+    if (body.status !== undefined && body.status !== 'active' && body.status !== 'inactive') {
+      return errorResponse('VALIDATION_ERROR', 'status must be "active" or "inactive".')
+    }
 
     // --- Apply the filters one at a time ---
     // A host looking at their own listings also sees inactive ones; guests only see active.
     let results = db.properties.filter((p) => (body.host_id ? p.host_id === body.host_id : p.status === 'active'))
 
+    if (body.status !== undefined) {
+      results = results.filter((p) => p.status === body.status)
+    }
     if (typeof body.location === 'string' && body.location.trim() !== '') {
       const location = body.location.trim().toLowerCase()
       results = results.filter(
@@ -256,23 +266,82 @@ export const propertyHandlers = [
     })
   }),
 
+  // One endpoint, three actions (team decision C1a): "get" (default), "block", "unblock".
+  // Blocking rule (C2a): a new block may not overlap any blocked or booked night;
+  // only the host's own blocks can be unblocked.
   http.post('*/properties/availability', async ({ request }) => {
     await delay(MOCK_DELAY_MS)
     const body = await readBody(request)
     if (!body) return invalidJsonResponse()
-    const missing = requireFields(body, ['property_id', 'start_date', 'end_date'])
+    const action = body.action ?? 'get'
+
+    // --- unblock: remove one host block ---
+    if (action === 'unblock') {
+      const missing = requireFields(body, ['availability_id', 'host_id'])
+      if (missing) return missing
+      const index = db.availability.findIndex((a) => a.availability_id === body.availability_id)
+      if (index === -1) return errorResponse('NOT_FOUND', `No availability block found with id ${String(body.availability_id)}.`)
+      const block = db.availability[index]
+      const property = db.properties.find((p) => p.property_id === block.property_id)
+      if (property?.host_id !== body.host_id) return notOwner('change the calendar of')
+      if (block.source !== 'host') {
+        return errorResponse(
+          'INVALID_STATUS',
+          'These nights are held by a reservation. Decline or cancel that reservation to free them.',
+        )
+      }
+      db.availability.splice(index, 1)
+      return HttpResponse.json({ availability_id: block.availability_id, unblocked: true })
+    }
+
+    if (action !== 'get' && action !== 'block') {
+      return errorResponse('VALIDATION_ERROR', 'action must be "get", "block" or "unblock".')
+    }
+
+    // --- get and block both take a property and a date range ---
+    const missing = requireFields(body, action === 'block' ? ['property_id', 'host_id', 'start_date', 'end_date'] : ['property_id', 'start_date', 'end_date'])
     if (missing) return missing
     const { start_date, end_date } = body
     if (!isValidDate(start_date) || !isValidDate(end_date)) {
       return errorResponse('VALIDATION_ERROR', 'Dates must be real dates in YYYY-MM-DD format.')
     }
-    if (end_date <= start_date) return errorResponse('VALIDATION_ERROR', 'end_date must be after start_date.')
-    if (!db.properties.some((p) => p.property_id === body.property_id)) return propertyNotFound(body.property_id)
+    if (end_date <= start_date) return errorResponse('VALIDATION_ERROR', 'The end date must be after the start date.')
+    const property = db.properties.find((p) => p.property_id === body.property_id)
+    if (!property) return propertyNotFound(body.property_id)
 
-    const items = db.availability.filter(
-      (block) =>
-        block.property_id === body.property_id && rangesOverlap(block.start_date, block.end_date, start_date, end_date),
+    if (action === 'get') {
+      const items = db.availability.filter(
+        (block) =>
+          block.property_id === body.property_id && rangesOverlap(block.start_date, block.end_date, start_date, end_date),
+      )
+      return HttpResponse.json({ items })
+    }
+
+    // --- block ---
+    if (property.host_id !== body.host_id) return notOwner('change the calendar of')
+    if (start_date < today()) return errorResponse('VALIDATION_ERROR', 'You can’t block dates in the past.')
+    const clash = db.availability.find(
+      (b) =>
+        b.property_id === property.property_id &&
+        b.status !== 'available' &&
+        rangesOverlap(b.start_date, b.end_date, start_date, end_date),
     )
-    return HttpResponse.json({ items })
+    if (clash) {
+      const what = clash.source === 'booking' ? 'a reservation' : 'one of your existing blocks'
+      return errorResponse('DATE_CONFLICT', `Some of these nights are already taken by ${what}.`, {
+        availability_id: clash.availability_id,
+      })
+    }
+    const block = {
+      availability_id: nextId('a', db.availability.map((a) => a.availability_id)),
+      property_id: property.property_id,
+      start_date,
+      end_date,
+      status: 'blocked' as const,
+      source: 'host' as const,
+      updated_datetime: nowDatetime(),
+    }
+    db.availability.push(block)
+    return HttpResponse.json(block, { status: 201 })
   }),
 ]

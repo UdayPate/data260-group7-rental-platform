@@ -1,11 +1,13 @@
 // The cream filter strip under the header on the search page.
 // Chips apply immediately by changing the URL; the search page reacts to the URL.
 // Price, Type and More open a small panel; it closes on a click outside or the Escape key.
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { AMENITY_LABELS, PROPERTY_TYPE_LABELS, formatPrice } from '../labels'
-import { RATING_CHIP_VALUE, readFilters, writeFilters, type SearchFilters } from '../searchFilters'
+import { RATING_CHIP_VALUE, readFilters, toggleIn, writeFilters, type SearchFilters } from '../searchFilters'
 import { AMENITIES, PROPERTY_TYPES, type Amenity, type PropertyType } from '../types/property'
+import { usePanelDismiss } from '../usePanelDismiss'
+import { CheckboxList, Chip, PanelBox } from './FilterChips'
 import { ChevronDownIcon, StarIcon } from './icons'
 
 // Amenities shown as their own chips; the rest are under "More".
@@ -13,68 +15,6 @@ const QUICK_AMENITIES: Amenity[] = ['parking', 'kitchen', 'wifi', 'washer', 'wor
 const MORE_AMENITIES = AMENITIES.filter((a) => !QUICK_AMENITIES.includes(a))
 
 type Panel = 'price' | 'type' | 'more' | null
-
-// ---------- Small building blocks ----------
-
-type ChipProps = {
-  active: boolean
-  onClick: () => void
-  children: ReactNode
-  disabled?: boolean
-  title?: string
-  expanded?: boolean // for chips that open a panel
-}
-
-// One pill: mustard when active, white when not.
-function Chip({ active, onClick, children, disabled = false, title, expanded }: ChipProps) {
-  const colors = active ? 'border-mustard-border bg-mustard' : 'border-cream-border bg-white'
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      aria-pressed={expanded === undefined ? active : undefined}
-      aria-expanded={expanded}
-      className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap text-cream-ink ${colors} disabled:cursor-not-allowed disabled:opacity-50`}
-    >
-      {children}
-    </button>
-  )
-}
-
-// The box that opens under a chip.
-function PanelBox({ children }: { children: ReactNode }) {
-  return (
-    <div className="absolute top-full left-0 z-20 mt-2 min-w-56 rounded-2xl border border-cream-border bg-white p-4 text-cream-ink shadow-lg">
-      {children}
-    </div>
-  )
-}
-
-// A checkbox list used by the Type and More panels.
-function CheckboxList<T extends string>(props: {
-  options: readonly T[]
-  labels: Record<T, string>
-  selected: T[]
-  onToggle: (value: T) => void
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      {props.options.map((option) => (
-        <label key={option} className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={props.selected.includes(option)}
-            onChange={() => props.onToggle(option)}
-            className="h-4 w-4 accent-primary"
-          />
-          {props.labels[option]}
-        </label>
-      ))}
-    </div>
-  )
-}
 
 // Min/max price inputs. It has its own typing state and only changes the URL on Apply.
 function PricePanel(props: { min: number | null; max: number | null; onApply: (min: number | null, max: number | null) => void }) {
@@ -102,11 +42,6 @@ function PricePanel(props: { min: number | null; max: number | null; onApply: (m
   )
 }
 
-// Adds the value if it's missing, removes it if it's there.
-function toggleIn<T>(list: T[], value: T): T[] {
-  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
-}
-
 // ---------- The strip ----------
 
 function FilterStrip() {
@@ -116,21 +51,7 @@ function FilterStrip() {
   const stripRef = useRef<HTMLDivElement>(null)
 
   // While a panel is open, close it on a click outside the strip or on Escape.
-  useEffect(() => {
-    if (openPanel === null) return
-    function onPointerDown(event: PointerEvent) {
-      if (!stripRef.current?.contains(event.target as Node)) setOpenPanel(null)
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpenPanel(null)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [openPanel])
+  usePanelDismiss(openPanel !== null, stripRef, () => setOpenPanel(null))
 
   // Changes some filters and puts the result in the URL (which triggers a new search).
   function update(changes: Partial<SearchFilters>) {

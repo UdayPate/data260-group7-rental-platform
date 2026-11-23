@@ -1,7 +1,13 @@
 // Property Service: /properties/*
 import { apiBaseUrls } from '../config'
 import type { ListResponse, PagedResponse } from '../types/api'
-import type { AvailabilityBlock, GetAvailabilityRequest } from '../types/availability'
+import type {
+  AvailabilityBlock,
+  BlockDatesRequest,
+  GetAvailabilityRequest,
+  UnblockDatesRequest,
+  UnblockDatesResponse,
+} from '../types/availability'
 import type {
   CreatePropertyRequest,
   DeletePropertyRequest,
@@ -29,3 +35,8 @@ export const searchProperties = (body: SearchPropertiesRequest) =>
 export const saveProperty = (body: SavePropertyRequest) => post<SavePropertyResponse>(base, '/properties/save', body)
 export const getAvailability = (body: GetAvailabilityRequest) =>
   post<ListResponse<AvailabilityBlock>>(base, '/properties/availability', body)
+// Same endpoint with action "block" / "unblock" (host only).
+export const blockDates = (body: Omit<BlockDatesRequest, 'action'>) =>
+  post<AvailabilityBlock>(base, '/properties/availability', { ...body, action: 'block' })
+export const unblockDates = (body: Omit<UnblockDatesRequest, 'action'>) =>
+  post<UnblockDatesResponse>(base, '/properties/availability', { ...body, action: 'unblock' })
