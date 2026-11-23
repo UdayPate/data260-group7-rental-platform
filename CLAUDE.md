@@ -156,5 +156,5 @@ required unless I say so.
   explain it to me in plain language with acronyms written out.
 - Don't add features beyond the spec unless I ask.
 - Run `npm run build` and `npm run lint` before saying a step is done; fix errors you introduce.
-- Git: I work on feature branches (e.g. `frontend/search-page`). Remind me if I'm on `main`
-  when we start a step. `.env` files must never be committed.
+- Git: I work directly on `main` and commit to it myself (you still never commit). Remind me
+  to `git pull` before we start each step. `.env` files must never be committed.
