@@ -47,7 +47,7 @@ tests/
 Platform name is **Cedar & Rye** (logo: "Cedar & Rye" with the "&" in terracotta). Reference
 mockup: the "Cedar & Rye" board on our design canvas. Retro comes from the type pairing, the
 cream filter strip and warm accents; layout, spacing and interactions stay modern and clean.
-Put these as Tailwind theme tokens in `tailwind.config` — never hard-code hex values in pages.
+Put these as Tailwind theme tokens in an `@theme` block in `frontend/src/index.css` — never hard-code hex values in pages.
 
 Colors:
 - `bg` #161311 (near-black, slightly warm) · `surface` #221E1B (cards, panels) · `surface-2` #2A2521 (inputs, toggles) · `border` #3D3630 · `border-strong` #5A5046
