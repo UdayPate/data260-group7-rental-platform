@@ -14,16 +14,20 @@ type Props = {
   property: PropertySearchResult
   saving: boolean // true while the save/unsave request is in flight
   onToggleSave: () => void
+  linkQuery: string // e.g. "check_in=...&check_out=...&guests=2", carried to the property page
 }
 
-function ListingCard({ property, saving, onToggleSave }: Props) {
+function ListingCard({ property, saving, onToggleSave, linkQuery }: Props) {
   const typeLabel = PROPERTY_TYPE_LABELS[property.property_type]
 
   return (
     // "relative" lets the heart button sit on top of the photo. The heart is outside
     // the <Link> because a button inside a link isn't valid HTML.
     <article className="relative overflow-hidden rounded-2xl border border-line bg-surface">
-      <Link to={`/properties/${property.property_id}`} className="block hover:brightness-110">
+      <Link
+        to={`/properties/${property.property_id}${linkQuery ? `?${linkQuery}` : ''}`}
+        className="block hover:brightness-110"
+      >
         {property.photo_url ? (
           <img src={property.photo_url} alt="" className="h-[190px] w-full object-cover" />
         ) : (

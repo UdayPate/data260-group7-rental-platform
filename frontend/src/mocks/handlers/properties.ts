@@ -94,7 +94,10 @@ export const propertyHandlers = [
     const missing = requireFields(body, ['property_id'])
     if (missing) return missing
     const property = db.properties.find((p) => p.property_id === body.property_id)
-    return property ? HttpResponse.json(property) : propertyNotFound(body.property_id)
+    if (!property) return propertyNotFound(body.property_id)
+    // is_saved says whether guest_id (if sent) saved this property; false without a guest_id.
+    const isSaved = db.saved.some((s) => s.guest_id === body.guest_id && s.property_id === property.property_id)
+    return HttpResponse.json({ ...property, is_saved: isSaved })
   }),
 
   http.post('*/properties/update', async ({ request }) => {

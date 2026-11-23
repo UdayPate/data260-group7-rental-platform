@@ -9,6 +9,7 @@ import type {
   GetPropertyRequest,
   Property,
   PropertySearchResult,
+  PropertyWithSaved,
   SavePropertyRequest,
   SavePropertyResponse,
   SearchPropertiesRequest,
@@ -19,7 +20,7 @@ import { post } from './client'
 const base = apiBaseUrls.properties
 
 export const createProperty = (body: CreatePropertyRequest) => post<Property>(base, '/properties/create', body)
-export const getProperty = (body: GetPropertyRequest) => post<Property>(base, '/properties/get', body)
+export const getProperty = (body: GetPropertyRequest) => post<PropertyWithSaved>(base, '/properties/get', body)
 export const updateProperty = (body: UpdatePropertyRequest) => post<Property>(base, '/properties/update', body)
 export const deleteProperty = (body: DeletePropertyRequest) =>
   post<DeletePropertyResponse>(base, '/properties/delete', body)

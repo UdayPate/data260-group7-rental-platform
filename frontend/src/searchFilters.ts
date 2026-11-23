@@ -87,13 +87,3 @@ export function toSearchRequest(
     page_size: pageSize,
   }
 }
-
-// A local calendar date as 'YYYY-MM-DD'. localDate() = today, localDate(1) = tomorrow,
-// localDate(1, '2026-12-04') = '2026-12-05'.
-export function localDate(offsetDays = 0, from?: string): string {
-  const date = from ? new Date(`${from}T00:00:00`) : new Date()
-  date.setDate(date.getDate() + offsetDays)
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${date.getFullYear()}-${m}-${d}`
-}

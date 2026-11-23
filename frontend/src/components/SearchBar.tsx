@@ -3,7 +3,8 @@
 // where the search page reads them. Filters from the cream strip are kept.
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
-import { localDate, readFilters, writeFilters } from '../searchFilters'
+import { localDate } from '../dates'
+import { readFilters, writeFilters } from '../searchFilters'
 import { SearchIcon } from './icons'
 
 const GUEST_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8] // 8 = the largest listing

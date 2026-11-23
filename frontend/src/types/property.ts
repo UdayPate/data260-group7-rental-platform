@@ -47,15 +47,20 @@ export type Property = {
 }
 // Availability is not embedded here: it comes from /properties/availability (see availability.ts).
 
-// A search result also says whether the current guest saved it (extension).
-export type PropertySearchResult = Property & { is_saved: boolean }
+// A property plus whether the current guest saved it (extension), returned by
+// /properties/search and /properties/get when a guest_id is sent.
+export type PropertyWithSaved = Property & { is_saved: boolean }
+export type PropertySearchResult = PropertyWithSaved
 
 // --- Request bodies (Property Service, /properties/*) ---
 
 // Server fills property_id, rating, review_count, created_datetime.
 export type CreatePropertyRequest = Omit<Property, 'property_id' | 'rating' | 'review_count' | 'created_datetime'>
 
-export type GetPropertyRequest = { property_id: string }
+export type GetPropertyRequest = {
+  property_id: string
+  guest_id?: string // fills is_saved for this guest
+}
 
 export type UpdatePropertyRequest = { property_id: string } & Partial<CreatePropertyRequest>
 

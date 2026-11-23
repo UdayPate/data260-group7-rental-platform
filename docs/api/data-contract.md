@@ -239,7 +239,7 @@ Non-paged lists use `{ "items": [ ... ] }`.
 | Endpoint | Request body | Response |
 |---|---|---|
 | `POST /properties/create` | Property **without** `property_id`, `rating`, `review_count`, `created_datetime`. Required: `host_id`, `title`, `property_type`, `address`, `city`, `state`, `zip_code`, `capacity`, `bedrooms`, `bathrooms`, `nightly_price`, `cleaning_fee` | `201` Property |
-| `POST /properties/get` | `{ "property_id" }` | Property |
+| `POST /properties/get` | `{ "property_id", "guest_id"? }` | Property plus `"is_saved"` (same meaning as in search: `true` if `guest_id` saved it, `false` otherwise or when no `guest_id` is sent). Inactive listings are returned too. |
 | `POST /properties/update` | `{ "property_id", ...only the fields being changed }` | updated Property |
 | `POST /properties/delete` | `{ "property_id" }` | `{ "property_id", "deleted": true }`. Returns `409 INVALID_STATUS` if the listing still has upcoming pending or approved reservations. |
 | `POST /properties/search` | see below | paged PropertySearchResult |

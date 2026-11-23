@@ -138,23 +138,29 @@ event-received timestamp so we can measure notification latency.
 required unless I say so.
 
 ## How to work with me
-- **Work one step at a time.** Before starting, show me a short numbered plan. Then do only
-  step 1, stop, tell me what you changed and how to run/check it, and wait for me to say
-  "next" (or give feedback) before doing the next step. Never chain several steps together.
-- **Ask me before every real decision** — library or package choice, folder/file structure,
-  data shape or field names, UI layout or behavior, anything the spec leaves open, and any
-  time there are two reasonable ways to do something. Give me the options in plain text
-  (2–3 choices, one line each on the tradeoff, your recommendation marked) and wait for my
-  answer. Don't pick for me and keep going.
+- **Work in chunks.** I name a chunk of work (e.g. "property details and booking"). For each chunk:
+  1. **Plan + all decisions in one message.** Show a short numbered plan and ask ALL the
+     decisions the chunk needs in that same message, then wait for my answers.
+  2. **Build the whole chunk without stopping.** Only stop if truly blocked (e.g. a new
+     decision that would change what I already approved, or a backend contract change).
+  3. **Test it fully yourself:** `npm run build`, `npm run lint`, the app in a real browser,
+     and the error cases (400 / 403 / 404 / 409, network failure). Fix what you broke.
+  4. **Report once:** a summary of what changed, the choices you made without asking, a
+     numbered click-through checklist for me to try in the browser, and one commit message.
+- **Decisions go to me** — library or package choice, folder/file structure, data shape or
+  field names, UI layout or behavior, anything the spec leaves open, and any time there are
+  two reasonable ways to do something. Ask them up front (step 1 above), in plain text:
+  2–3 choices, one line each on the tradeoff, your recommendation marked. Small calls made
+  while building get listed under "choices made without asking" so I can review them.
 - **Never commit, push, merge, rebase, reset, or delete branches.** I do all git writes
   myself. You may run read-only git commands (`git status`, `git diff`, `git log`) and you
-  may suggest a commit message when a step is done, but I run the commit.
+  may suggest a commit message when a chunk is done, but I run the commit.
 - **Never install a package without asking first** (say what it is and why).
 - **I must be able to explain every line live during the demo** (the instructor can ask for a
   live change like "add a pet-friendly filter"). So: keep code simple and readable, no clever
   abstractions, short comments on anything non-obvious, and when you make a design choice,
   explain it to me in plain language with acronyms written out.
 - Don't add features beyond the spec unless I ask.
-- Run `npm run build` and `npm run lint` before saying a step is done; fix errors you introduce.
+- Run `npm run build` and `npm run lint` before saying a chunk is done; fix errors you introduce.
 - Git: I work directly on `main` and commit to it myself (you still never commit). Remind me
-  to `git pull` before we start each step. `.env` files must never be committed.
+  to `git pull` before we start each chunk. `.env` files must never be committed.

@@ -96,6 +96,13 @@ function SearchResults({ paramsString, guestId }: ResultsProps) {
     }
   }
 
+  // The dates and guests go along to the property page, so its booking panel starts filled in.
+  const linkParams = new URLSearchParams()
+  if (filters.check_in) linkParams.set('check_in', filters.check_in)
+  if (filters.check_out) linkParams.set('check_out', filters.check_out)
+  if (filters.guests !== null) linkParams.set('guests', String(filters.guests))
+  const linkQuery = linkParams.toString()
+
   // "6 STAYS NEAR SAN JOSE" / "29 STAYS"
   const heading = `${total} ${total === 1 ? 'stay' : 'stays'}${filters.location ? ` near ${filters.location}` : ''}`
   const headingClass = 'font-condensed text-2xl font-bold tracking-[0.06em] uppercase'
@@ -142,6 +149,7 @@ function SearchResults({ paramsString, guestId }: ResultsProps) {
               property={property}
               saving={savingIds.includes(property.property_id)}
               onToggleSave={() => toggleSave(property)}
+              linkQuery={linkQuery}
             />
           ))}
         </div>
