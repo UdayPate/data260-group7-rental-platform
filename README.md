@@ -1,0 +1,1 @@
+# data260-group7-rental-platform
