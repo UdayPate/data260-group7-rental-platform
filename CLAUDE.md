@@ -34,7 +34,7 @@ tests/
 ## Frontend stack (decided — don't swap without asking)
 - Vite + React + TypeScript
 - React Router for routing (guest area, host area, AI, dashboards)
-- Tailwind CSS for styling; keep it clean and plain, no UI kit unless I approve one
+- Tailwind CSS for styling, using the theme tokens below; no UI kit unless I approve one
 - Recharts for dashboard charts
 - **MSW (Mock Service Worker) for mocks**: every API call goes through a real `fetch`
   wrapper in `src/api/`; MSW intercepts it during development. Switching to the real backend
@@ -42,6 +42,47 @@ tests/
   rewrite page code to switch.
 - Native WebSocket for live updates (AI debate stream, "dates no longer available").
   Put socket code in `src/realtime/`, with a mock emitter for development.
+
+## Visual theme: "Cedar & Rye" (mid-century retro, dark, but modern)
+Platform name is **Cedar & Rye** (logo: "Cedar & Rye" with the "&" in terracotta). Reference
+mockup: the "Cedar & Rye" board on our design canvas. Retro comes from the type pairing, the
+cream filter strip and warm accents; layout, spacing and interactions stay modern and clean.
+Put these as Tailwind theme tokens in `tailwind.config` — never hard-code hex values in pages.
+
+Colors:
+- `bg` #161311 (near-black, slightly warm) · `surface` #221E1B (cards, panels) · `surface-2` #2A2521 (inputs, toggles) · `border` #3D3630 · `border-strong` #5A5046
+- `cream` #F1EADC — the light "strip" surface (filter bar, chair challenge cards, light callouts); text on cream is #2A2521, secondary #6B5D4D, chip border #D8CDB9
+- `text` #F3ECE0 · `text-soft` #E2D9CB · `text-muted` #C9BDAB (never darker than this on dark backgrounds — must stay readable on a projector)
+- `primary` #E8673A (terracotta/orange) — main actions (Search, Approve, Book); text on it is #161311, not white
+- `mustard` #E3B04B — active filter chips (border #C9952F), "Guest favorite" badges, ratings ★, selected toggle, verdict outline (verdict fill #2A2418)
+- `teal` #3F8F8A — secondary accent for charts and info states
+- Price pill: bg #2F2A25, border #4A423A
+- Status: available/approved #8FD19E · pending/partial #E3B04B · declined/cancelled/error #F19A8A (outline buttons use border #7A3A36)
+- Agent colors (use everywhere — debate view, timelines, charts, votes): Matcher #7CC8E8 ·
+  Risk #F08A55 · Fairness Auditor #C9A8F0 · Chair #F3ECE0 · Parser #8FD19E · Explanation #E3B04B
+- Chart palette (in this order): #E8673A, #3F8F8A, #E3B04B, #7CC8E8, #C9A8F0, #8FD19E
+
+Type (Google Fonts):
+- **Fraunces** (700–800) — logo and a few big headings only (page titles like "The Debate")
+- **Barlow Condensed** (600–700) — listing titles, section headings (often UPPERCASE, e.g.
+  "28 STAYS NEAR SAN JOSE"), prices, KPI numbers, small labels with 0.06–0.08em letter-spacing
+- **Barlow** (400–600) — all body and UI text
+- **DM Mono** — IDs (trace_id, booking IDs), timestamps, and numeric table columns
+
+Components and details:
+- Header: dark, logo left, nav, pill search bar with orange Search button, mustard Guest/Host toggle
+- Cream filter strip directly under the header, full width, holding the spec's filters as pills
+  (active = mustard, inactive = white with #D8CDB9 border) — on host pages the same strip holds listing filters
+- Cards: `surface` with 1px `border`, 16px radius; property photo on top (190px tall, cover),
+  mustard "★ Guest favorite" badge top-left, round save/heart button top-right (filled terracotta when saved)
+- Listing title in Barlow Condensed bold ~21px; meta line in text-muted; price in the price pill
+- Buttons, inputs, chips, toggles: fully rounded (pill); primary = filled terracotta, secondary = outline
+- Debate panel: round labels in condensed uppercase; chair challenges on cream cards; final
+  verdict in a mustard-outlined card with Approve / Edit / Reject
+- Dashboards: same tokens; charts on `surface` cards; KPI numbers in Barlow Condensed
+
+Keep it modern: no skeuomorphic textures, no gradient washes, no emoji as icons (use inline
+SVG or one icon set I approve). Text contrast ≥ 4.5:1.
 
 ## API contract rules
 - The spec defines the endpoints; most are `POST` with a JSON body even for reads
