@@ -97,12 +97,23 @@ event-received timestamp so we can measure notification latency.
 required unless I say so.
 
 ## How to work with me
-- Build in small, reviewable steps. After each step, tell me what you changed and how to run it.
+- **Work one step at a time.** Before starting, show me a short numbered plan. Then do only
+  step 1, stop, tell me what you changed and how to run/check it, and wait for me to say
+  "next" (or give feedback) before doing the next step. Never chain several steps together.
+- **Ask me before every real decision** — library or package choice, folder/file structure,
+  data shape or field names, UI layout or behavior, anything the spec leaves open, and any
+  time there are two reasonable ways to do something. Give me the options in plain text
+  (2–3 choices, one line each on the tradeoff, your recommendation marked) and wait for my
+  answer. Don't pick for me and keep going.
+- **Never commit, push, merge, rebase, reset, or delete branches.** I do all git writes
+  myself. You may run read-only git commands (`git status`, `git diff`, `git log`) and you
+  may suggest a commit message when a step is done, but I run the commit.
+- **Never install a package without asking first** (say what it is and why).
 - **I must be able to explain every line live during the demo** (the instructor can ask for a
   live change like "add a pet-friendly filter"). So: keep code simple and readable, no clever
   abstractions, short comments on anything non-obvious, and when you make a design choice,
   explain it to me in plain language with acronyms written out.
 - Don't add features beyond the spec unless I ask.
 - Run `npm run build` and `npm run lint` before saying a step is done; fix errors you introduce.
-- Git: work on a feature branch (e.g. `frontend/search-page`), small commits with clear
-  messages. Never commit to `main` directly, never force-push, never commit `.env` files.
+- Git: I work on feature branches (e.g. `frontend/search-page`). Remind me if I'm on `main`
+  when we start a step. `.env` files must never be committed.
