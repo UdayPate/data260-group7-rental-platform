@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router'
 import './index.css'
 import App from './App.tsx'
 import { mocksEnabled } from './config'
+import { CurrentUserProvider } from './context/CurrentUserContext'
 
 // When mocks are on, start MSW (Mock Service Worker) before the app renders, so even
 // the very first API call is answered by the mocks. When off, the mock code is never loaded.
@@ -19,7 +20,10 @@ startMocks().then(() => {
     <StrictMode>
       {/* BrowserRouter keeps the page in sync with the address bar URL */}
       <BrowserRouter>
-        <App />
+        {/* Makes the current demo guest/host available to every page */}
+        <CurrentUserProvider>
+          <App />
+        </CurrentUserProvider>
       </BrowserRouter>
     </StrictMode>,
   )

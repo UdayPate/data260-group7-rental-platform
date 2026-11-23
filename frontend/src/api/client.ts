@@ -61,3 +61,8 @@ export function post<T>(baseUrl: string, path: string, body: unknown): Promise<T
 export function get<T>(baseUrl: string, path: string): Promise<T> {
   return request<T>('GET', baseUrl + path)
 }
+
+// The message to show for any caught error (an ApiError's message is already readable).
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+}
