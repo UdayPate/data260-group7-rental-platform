@@ -50,9 +50,9 @@ cream filter strip and warm accents; layout, spacing and interactions stay moder
 Put these as Tailwind theme tokens in an `@theme` block in `frontend/src/index.css` — never hard-code hex values in pages.
 
 Colors:
-- `bg` #161311 (near-black, slightly warm) · `surface` #221E1B (cards, panels) · `surface-2` #2A2521 (inputs, toggles) · `border` #3D3630 · `border-strong` #5A5046
+- `bg` #161311 (near-black, slightly warm) · `surface` #221E1B (cards, panels) · `surface-2` #2A2521 (inputs, toggles) · `line` #3D3630 · `line-strong` #5A5046 (borders)
 - `cream` #F1EADC — the light "strip" surface (filter bar, chair challenge cards, light callouts); text on cream is #2A2521, secondary #6B5D4D, chip border #D8CDB9
-- `text` #F3ECE0 · `text-soft` #E2D9CB · `text-muted` #C9BDAB (never darker than this on dark backgrounds — must stay readable on a projector)
+- `fg` #F3ECE0 · `fg-soft` #E2D9CB · `fg-muted` #C9BDAB (text colors; never darker than this on dark backgrounds — must stay readable on a projector)
 - `primary` #E8673A (terracotta/orange) — main actions (Search, Approve, Book); text on it is #161311, not white
 - `mustard` #E3B04B — active filter chips (border #C9952F), "Guest favorite" badges, ratings ★, selected toggle, verdict outline (verdict fill #2A2418)
 - `teal` #3F8F8A — secondary accent for charts and info states
@@ -73,9 +73,9 @@ Components and details:
 - Header: dark, logo left, nav, pill search bar with orange Search button, mustard Guest/Host toggle
 - Cream filter strip directly under the header, full width, holding the spec's filters as pills
   (active = mustard, inactive = white with #D8CDB9 border) — on host pages the same strip holds listing filters
-- Cards: `surface` with 1px `border`, 16px radius; property photo on top (190px tall, cover),
+- Cards: `surface` with 1px `line` border, 16px radius; property photo on top (190px tall, cover),
   mustard "★ Guest favorite" badge top-left, round save/heart button top-right (filled terracotta when saved)
-- Listing title in Barlow Condensed bold ~21px; meta line in text-muted; price in the price pill
+- Listing title in Barlow Condensed bold ~21px; meta line in fg-muted; price in the price pill
 - Buttons, inputs, chips, toggles: fully rounded (pill); primary = filled terracotta, secondary = outline
 - Debate panel: round labels in condensed uppercase; chair challenges on cream cards; final
   verdict in a mustard-outlined card with Approve / Edit / Reject
