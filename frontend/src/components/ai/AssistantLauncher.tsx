@@ -21,7 +21,7 @@ import { SparkleIcon } from '../icons'
 import { AgentStrip } from './DebateParts'
 
 function AssistantLauncher() {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const [searchParams] = useSearchParams()
   const { guestId } = useCurrentUser()
 
@@ -45,7 +45,7 @@ function AssistantLauncher() {
   // Guest pages only, and not on the AI pages themselves (D1a), nor on Messages, where it
   // would sit on top of the message box. Returning null keeps this component (and its
   // state) alive, so the task is still here when you come back.
-  const hidden = isHostPath(pathname) || pathname.startsWith('/ai') || pathname === '/guest/messages'
+  const hidden = isHostPath(pathname, search) || pathname.startsWith('/ai') || pathname === '/guest/messages'
   if (hidden) return null
 
   const onSearchPage = pathname === '/'

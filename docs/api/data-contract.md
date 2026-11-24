@@ -8,9 +8,8 @@ frontend changes.
 The frontend lead (Uday) owns the data shapes in this document, so treat them as final.
 To change something, ask him first so the types and mocks change at the same time.
 
-Covered so far: **User**, **Property**, **Booking**, **Messaging**, **Review** and **AI Agent** services
-(all endpoints). The request and response bodies for Analytics will be added when the
-dashboards are built.
+Covered so far: **User**, **Property**, **Booking**, **Messaging**, **Review**, **Analytics** and
+**AI Agent** services (all endpoints).
 
 ---
 
@@ -154,6 +153,7 @@ Any block whose status is not `"available"` makes those nights unavailable.
 | Field | Type | Notes |
 |---|---|---|
 | reservation_id | string | |
+| trace_id | string | UUID created when the booking request arrives; carried by every Kafka event, consumer log and later action for this reservation (approve, cancel, completion, review), so its whole journey can be shown (spec §8) |
 | property_id | string | |
 | guest_id | string | |
 | check_in | date | |
@@ -395,6 +395,67 @@ One endpoint, three actions:
 4. Reviews can't be edited or deleted. A deleted guest's reviews stay; the UI shows them as "Former guest".
 5. Kafka: publish `review.created` (spec 6.1) with the review as payload and `idempotency_key` = `review_id`,
    so the Property Service can update the rating.
+
+### Analytics & Logging Service (owners: Rohini and Shashank)
+
+The dashboards read everything from these endpoints. `GET` endpoints take query parameters;
+`?days=` is `7`, `30` (default) or `90` (anything else is `400`). Types: `frontend/src/types/analytics.ts`.
+
+| Endpoint | Query / body | Response |
+|---|---|---|
+| `POST /events/ingest` | one **shared envelope** (spec 6.2) as the body | `202 { "accepted": true, "duplicate": false }`; the same `idempotency_key` again returns `200` with `"duplicate": true`. An invalid envelope returns **`400`** and is counted as a **rejected envelope** and written to the dead-letter list. |
+| `GET /analytics/guest/dashboard` | `guest_id` (required), `days`, `trace_id`? | GuestDashboard |
+| `GET /analytics/host/dashboard` | `host_id` (required), `days`, `trace_id`? | HostDashboard |
+| `GET /analytics/platform/dashboard` | `days`, `trace_id`? | PlatformDashboard (**extension**, not in spec §6) |
+| `GET /analytics/ai/dashboard` | `days`, `trace_id`? | AiDashboard (**extension**) |
+| `GET /analytics/traces` | `limit` (1–100, default 20) | `{ "items": TraceSummary[] }`: recent journeys, newest first (**extension**) |
+| `GET /analytics/traces/{trace_id}` | none | Trace (`404` if unknown) (**extension**) |
+| `GET /analytics/properties/top` | `limit` | `{ "items": [{ property_id, title, city, bookings, revenue }] }` by approved/completed bookings |
+| `GET /analytics/funnel` | `days`, `host_id`? | `{ host_id, days, funnel }`, the views → saves → requests → approved funnel (all hosts if no `host_id`) |
+| `GET /analytics/geo` | none | `{ "items": [{ city, listings, bookings }] }` |
+
+**Events the UI sends (C4a):** `property.viewed` (property page; `entity` = the property) and `search.performed`
+(search results; `payload.results` = number of results). They are fire-and-forget: the UI never shows an analytics
+error to a guest, it only logs it in the browser console. The ingest endpoint must validate the envelope:
+all of `event_type`, `trace_id`, `timestamp` (ISO), `actor_id`, `entity { entity_type, entity_id }`, `payload`
+(object) and `idempotency_key`; an unknown `event_type` is also rejected.
+
+**Every dashboard has a `sources` object** saying, for each section, whether its numbers are `"computed"` from
+the platform's own records or `"sample"` values (and a one-line `note`). The UI shows "sample" with a chip, so
+nobody presents sample Kafka metrics as measured. A real implementation returns `"computed"` everywhere it can.
+
+**GuestDashboard:** `bookings_per_day [{ date, count }]` (one per day in the range), `status_summary [{ status, count }]`
+(all of the guest's reservations), `saved_per_week [{ week_start, saves }]`, `average_match_score` (0–1 or null:
+score of the stays the AI recommended to this guest), `recommendation_approvals { approved, edited, rejected }`.
+
+**HostDashboard:** `funnel [{ step: "views"|"saves"|"requests"|"approved", count }]` (in the range),
+`occupancy_rate` (0–1: booked nights in the **next** `days` days ÷ (active listings × days)), `average_nightly_price`,
+`average_response_minutes`, `response_rate`, and for the **last 12 months**: `revenue_by_month [{ month: "YYYY-MM", revenue }]`
+(approved/completed stays by check-in month), `cancellations_by_month [{ month, cancellations }]` (cancelled or declined),
+`rating_by_month [{ month, average_rating|null, reviews }]`.
+
+**PlatformDashboard:** `events_by_topic [{ topic, count }]` (with `trace_id`: that journey's events only),
+`consumer_groups` (up to 4 names), `consumer_lag [{ time, <group>: lag, … }]`, `throughput [{ time, events_per_sec }]`
+(one point per day; every 3 days for 90 days), `errors_retries [{ service, errors, retries }]`,
+`dead_letters [{ topic, reason, trace_id, timestamp }]`, `rejected_envelopes`, `workflow_latency [{ workflow, avg_ms, p95_ms }]`.
+
+**AiDashboard:** `debates`, `timeline { trace_id, task_id, request_text, points [{ agent, event_type, offset_ms, round }] }`
+(the chosen or latest debate), `disagreement_histogram [{ bucket: "0"|"0.33"|"0.67", debates }]`, `average_challenges`,
+`dissent_rate` (0–1), `votes [{ vote: "keep"|"switch"|"abstain"|"timeout", count }]`,
+`evaluation [{ configuration, precision_at_10, recall_at_10, mean_rank }]` (the five configurations of spec 7.3.1),
+`approvals { approved, edited, rejected }`. With the `trace_id` of a debate, every value is for that debate only.
+
+**Journeys (spec §8, filter by `trace_id`):**
+
+- **TraceStep** = `{ trace_id, event_type, service, timestamp, latency_ms, status, error }`, where `status` is
+  `"ok" | "retried" | "failed" | "timed_out" | "dead_lettered"` and `error` is a readable reason or null. These are
+  the fields spec §8 says to persist for every important workflow step.
+- **TraceSummary** = `{ trace_id, kind: "booking"|"ai", entity_id (reservation_id or task_id), title, started, total_ms, step_count, has_problem }`.
+- **Trace** = TraceSummary plus `steps: TraceStep[]` (in time order) and `source`.
+
+A booking journey is every step that carried the reservation's `trace_id`: the API call, `booking.requested` on
+Kafka, the consumer's MySQL write (including retries), the availability push, then approve / decline / cancel,
+`booking.completed` and `review.created`. An AI journey is the debate's stream events.
 
 ---
 

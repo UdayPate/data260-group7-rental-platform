@@ -1,5 +1,5 @@
 // Which guest saved which property (the "heart" on a listing card).
-export type SavedProperty = { guest_id: string; property_id: string }
+export type SavedProperty = { guest_id: string; property_id: string; saved_datetime?: string } // db.ts fills in seed times
 
 export const seedSaved: SavedProperty[] = [
   { guest_id: 'g_001', property_id: 'p_001' },

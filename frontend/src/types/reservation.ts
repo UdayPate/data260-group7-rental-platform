@@ -11,6 +11,7 @@ export type PriceBreakdown = {
 // Spec section 4: Reservation.
 export type Reservation = {
   reservation_id: string
+  trace_id: string // set by the Booking Service when the request arrives; follows the whole journey (C2a)
   property_id: string
   guest_id: string
   check_in: string // date

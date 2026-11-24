@@ -2,6 +2,7 @@
 // and the cream filter strip); this page asks the Property Service and shows the cards.
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
+import { trackEvent } from '../../api/analytics'
 import { errorMessage } from '../../api/client'
 import { saveProperty, searchProperties } from '../../api/properties'
 import ErrorBanner from '../../components/ErrorBanner'
@@ -59,6 +60,8 @@ function SearchResults({ paramsString, guestId }: ResultsProps) {
         setItems(result.items)
         setTotal(result.total)
         setLoading(false)
+        // Analytics (C4a): one search.performed event per search. Fire-and-forget.
+        trackEvent('search.performed', guestId, { entity_type: 'search', entity_id: paramsString || 'all' }, { results: result.total })
       })
       .catch((err: unknown) => {
         if (ignore) return

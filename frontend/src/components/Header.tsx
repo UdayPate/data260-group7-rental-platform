@@ -38,7 +38,7 @@ function Header() {
 
   // The mode comes from the URL (see mode.ts). No separate state, so the toggle
   // and the page can never disagree.
-  const isHost = isHostPath(pathname)
+  const isHost = isHostPath(pathname, search)
   const navItems = isHost ? hostNav : guestNav
   const userId = isHost ? hostId : guestId // whose unread messages the badge counts
   const onSearchPage = pathname === '/'

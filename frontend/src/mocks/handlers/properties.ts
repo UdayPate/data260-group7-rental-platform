@@ -255,7 +255,7 @@ export const propertyHandlers = [
 
     // Saving twice or unsaving something not saved is fine: the result is the same.
     const index = db.saved.findIndex((s) => s.guest_id === body.guest_id && s.property_id === body.property_id)
-    if (body.saved && index === -1) db.saved.push({ guest_id: guest.guest_id, property_id: String(body.property_id) })
+    if (body.saved && index === -1) db.saved.push({ guest_id: guest.guest_id, property_id: String(body.property_id), saved_datetime: nowDatetime() })
     if (!body.saved && index !== -1) db.saved.splice(index, 1)
 
     guest.saved_properties_count = db.saved.filter((s) => s.guest_id === guest.guest_id).length

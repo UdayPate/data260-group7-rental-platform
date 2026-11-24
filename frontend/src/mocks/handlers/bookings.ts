@@ -83,6 +83,7 @@ export const bookingHandlers = [
 
     const reservation: Reservation = {
       reservation_id: nextId('r', db.reservations.map((r) => r.reservation_id)),
+      trace_id: crypto.randomUUID(), // starts this booking's journey (C2a)
       property_id: property.property_id,
       guest_id: guest.guest_id,
       check_in,

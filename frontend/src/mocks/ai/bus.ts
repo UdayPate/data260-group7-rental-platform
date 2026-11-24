@@ -21,6 +21,7 @@ const subscribers = new Set<Subscriber>()
 let taskCounter = 0
 
 export const getTaskEntry = (taskId: string) => tasks.get(taskId)
+export const allTaskEntries = () => [...tasks.values()] // for the analytics mock
 
 const FINISHED = ['completed', 'failed', 'timed_out']
 export const isFinished = (entry: TaskEntry) => FINISHED.includes(entry.task.status)

@@ -49,6 +49,12 @@ async function request<T>(method: 'GET' | 'POST', url: string, body?: unknown): 
     throw new ApiError(response.status, 'UNKNOWN_ERROR', `The request failed (HTTP ${response.status}). Please try again.`)
   }
 
+  // A "successful" reply that isn't JSON (e.g. the dev server answering a GET with its own
+  // HTML page because no backend is running) must still show an error, not hang the page.
+  if (data === null) {
+    throw new ApiError(response.status, 'UNKNOWN_ERROR', 'The server sent a reply the app could not read. Check that the service is running.')
+  }
+
   return data as T
 }
 

@@ -175,6 +175,13 @@ function ReservationStatus({ reservationId, guestId }: Props) {
         <p className="font-mono text-sm text-fg-muted">
           {reservation.reservation_id} · requested {formatDateTime(reservation.booking_datetime)}
         </p>
+        {/* Every step of this booking across services (team decision C2a) */}
+        <p className="font-mono text-xs text-fg-muted">
+          trace_id {reservation.trace_id} ·{' '}
+          <Link to={`/dashboards/platform?trace_id=${reservation.trace_id}`} className="font-sans font-semibold text-primary hover:underline">
+            View journey
+          </Link>
+        </p>
       </div>
 
       <div className="grid gap-4 rounded-2xl border border-line bg-surface p-5 sm:grid-cols-2">

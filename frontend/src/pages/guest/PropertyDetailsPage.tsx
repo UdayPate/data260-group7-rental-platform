@@ -3,6 +3,7 @@
 // Dates and guests can arrive in the URL from the search page (team decision D5a).
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
+import { trackEvent } from '../../api/analytics'
 import { errorMessage } from '../../api/client'
 import { getAvailability, getProperty, saveProperty } from '../../api/properties'
 import { getHost } from '../../api/users'
@@ -82,6 +83,8 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
         setHost(loadedHost)
         setBlocks(availability.items)
         setLoading(false)
+        // Analytics (C4a): feeds the host's views -> bookings funnel. Fire-and-forget.
+        trackEvent('property.viewed', guestId, { entity_type: 'property', entity_id: propertyId })
       } catch (err) {
         if (ignore) return
         setError(errorMessage(err))

@@ -16,8 +16,9 @@ import { seedReviews } from './data/reviews'
 import { seedSaved, type SavedProperty } from './data/saved'
 import { pastStayReservations, pastStayReviews } from './data/pastStays'
 import { seedMessages, seedThreads } from './data/threads'
-import { nightsBetween, rangesOverlap, today } from './dates'
+import { daysAgoDatetime, nightsBetween, rangesOverlap, today } from './dates'
 import type { Message, Thread } from '../types/message'
+import type { EventEnvelope } from '../types/analytics'
 
 // nights x nightly price + cleaning fee (no taxes or service fee in this project).
 export function priceBreakdown(property: Property, checkIn: string, checkOut: string): PriceBreakdown {
@@ -47,13 +48,15 @@ export function holdsDates(reservation: Reservation): boolean {
 // structuredClone makes deep copies, so changing the db never changes the seed arrays.
 const properties: Property[] = structuredClone(seedProperties)
 const hosts: Host[] = structuredClone(seedHosts)
-const saved: SavedProperty[] = structuredClone(seedSaved)
+// Seed saves get times spread over the last weeks (for the saved-activity chart).
+const saved: SavedProperty[] = structuredClone(seedSaved).map((s, i) => ({ ...s, saved_datetime: s.saved_datetime ?? daysAgoDatetime(2 + i * 4) }))
 // Recent reviews plus the older San Jose stays' reviews (data/pastStays.ts).
 const reviews: Review[] = structuredClone([...seedReviews, ...pastStayReviews])
 
 const reservations: Reservation[] = [...seedReservations, ...pastStayReservations].map((seed) => {
   const property = properties.find((p) => p.property_id === seed.property_id)!
-  return { ...seed, price_breakdown: priceBreakdown(property, seed.check_in, seed.check_out) }
+  // Each seed reservation gets a trace_id here (new on every reload, like a fresh demo database).
+  return { ...seed, trace_id: crypto.randomUUID(), price_breakdown: priceBreakdown(property, seed.check_in, seed.check_out) }
 })
 
 // Guests' counters are counted from the data, not typed in, so they always match.
@@ -110,6 +113,10 @@ export const db = {
   idempotencyKeys: new Map<string, string>(),
   // idempotency_key -> message_id: a repeated send returns the first message.
   messageKeys: new Map<string, string>(),
+  // Analytics: events the UI sent to /events/ingest, and envelopes that failed validation.
+  uiEvents: [] as EventEnvelope[],
+  ingestKeys: new Set<string>(),
+  rejectedEnvelopes: [] as { topic: string; reason: string; trace_id: string; timestamp: string }[],
 }
 
 // The Booking Service's daily job (contract booking rule 6, team decisions M1a/M2a):
