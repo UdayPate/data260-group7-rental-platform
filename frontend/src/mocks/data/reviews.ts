@@ -1,4 +1,7 @@
 import type { Review } from '../../types/review'
+
+// Seed reviews leave out guest_name; db.ts copies it in from the guest.
+export type SeedReview = Omit<Review, 'guest_name'>
 import { daysAgoDatetime } from '../dates'
 
 // Reviews for the completed seed stays (ids match reservations.ts). Team decision C4a:
@@ -6,7 +9,7 @@ import { daysAgoDatetime } from '../dates'
 // properties.ts is its historical total, which these reviews are part of.
 // r_012 (Alex Chen at the Downtown High-Rise) is left unreviewed on purpose, so the
 // demo guest has a "To review" prompt. v_003 and v_006 have no host reply yet.
-export const seedReviews: Review[] = [
+export const seedReviews: SeedReview[] = [
   { review_id: 'v_001', reservation_id: 'r_001', property_id: 'p_001', guest_id: 'g_003', host_id: 'h_001', rating: 5,
     review_text: 'Lovely quiet cottage, spotless kitchen and the driveway made parking easy. Maya answered every question within minutes.',
     created_datetime: daysAgoDatetime(35),

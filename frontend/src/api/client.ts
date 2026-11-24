@@ -1,5 +1,6 @@
 // The one fetch wrapper every API module uses. It sends JSON, and turns any
 // failure into an ApiError with a readable message the UI can show as-is.
+import { currentToken, endSession } from '../auth/session'
 import type { ApiErrorBody, ApiErrorCode } from '../types/api'
 
 // Extra codes for failures that never reach a service's error body.
@@ -27,11 +28,17 @@ function isApiErrorBody(data: unknown): data is ApiErrorBody {
 }
 
 async function request<T>(method: 'GET' | 'POST', url: string, body?: unknown): Promise<T> {
+  // Every call sends this tab's login token, if there is one.
+  const headers: Record<string, string> = {}
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const token = currentToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+
   let response: Response
   try {
     response = await fetch(url, {
       method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     })
   } catch {
@@ -41,6 +48,10 @@ async function request<T>(method: 'GET' | 'POST', url: string, body?: unknown): 
 
   // Some error responses have no JSON body; treat those as null.
   const data: unknown = await response.json().catch(() => null)
+
+  // 401 = not logged in (missing, invalid or expired token): go to the login page.
+  // Not for /auth/* itself, where 401 just means "wrong email or password".
+  if (response.status === 401 && !url.includes('/auth/')) endSession()
 
   if (!response.ok) {
     if (isApiErrorBody(data)) {

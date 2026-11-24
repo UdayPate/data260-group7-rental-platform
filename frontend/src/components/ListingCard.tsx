@@ -13,7 +13,7 @@ function isGuestFavorite(property: { rating: number; review_count: number }) {
 type Props = {
   property: PropertySearchResult
   saving: boolean // true while the save/unsave request is in flight
-  onToggleSave: () => void
+  onToggleSave?: () => void // left out = no heart (hosts and the admin can't save stays)
   linkQuery: string // e.g. "check_in=...&check_out=...&guests=2", carried to the property page
 }
 
@@ -67,16 +67,18 @@ function ListingCard({ property, saving, onToggleSave, linkQuery }: Props) {
         </span>
       )}
 
-      <button
-        type="button"
-        onClick={onToggleSave}
-        disabled={saving}
-        aria-pressed={property.is_saved}
-        aria-label={property.is_saved ? `Remove ${property.title} from saved` : `Save ${property.title}`}
-        className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-bg/80 text-fg hover:bg-bg disabled:cursor-wait disabled:opacity-60"
-      >
-        <HeartIcon filled={property.is_saved} className={`h-5 w-5 ${property.is_saved ? 'text-primary' : ''}`} />
-      </button>
+      {onToggleSave && (
+        <button
+          type="button"
+          onClick={onToggleSave}
+          disabled={saving}
+          aria-pressed={property.is_saved}
+          aria-label={property.is_saved ? `Remove ${property.title} from saved` : `Save ${property.title}`}
+          className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-bg/80 text-fg hover:bg-bg disabled:cursor-wait disabled:opacity-60"
+        >
+          <HeartIcon filled={property.is_saved} className={`h-5 w-5 ${property.is_saved ? 'text-primary' : ''}`} />
+        </button>
+      )}
     </article>
   )
 }

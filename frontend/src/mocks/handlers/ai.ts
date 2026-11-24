@@ -1,6 +1,7 @@
 // Mock AI Agent Service: REST endpoints + the WebSocket debate stream.
 import { delay, http, HttpResponse, passthrough, ws } from 'msw'
 import type { AiResult, HumanDecision } from '../../types/ai'
+import { socketClaims } from '../auth/gate'
 import { CLOSE_DELAY_MS, getTaskEntry, isFinished, publish, startTask, subscribe } from '../ai/bus'
 import { db } from '../db'
 import { errorResponse, invalidJsonResponse, MOCK_DELAY_MS, readBody, requireFields } from '../responses'
@@ -17,11 +18,21 @@ const isPageLoad = (request: Request) =>
 const debateStream = ws.link(/\/ai\/tasks\/[^/]+\/stream/)
 
 // addEventListener returns the handler that goes in the handlers list.
-const debateStreamHandler = debateStream.addEventListener('connection', ({ client }) => {
+// The token comes in "?token=" (browsers can't set headers on a WebSocket).
+const debateStreamHandler = debateStream.addEventListener('connection', async ({ client }) => {
+  const claims = await socketClaims(client.url)
+  if (!claims) {
+    client.close(4401, 'Missing, invalid or expired token') // the page sends you to the login page
+    return
+  }
   const taskId = decodeURIComponent(client.url.pathname.split('/')[3] ?? '')
   const entry = getTaskEntry(taskId)
   if (!entry) {
     client.close(4404, 'No AI task with this id') // 4000+ = don't retry
+    return
+  }
+  if (entry.task.guest_id !== claims.sub) {
+    client.close(4403, 'This AI request belongs to another guest')
     return
   }
   const afterSeq = Number(client.url.searchParams.get('after_seq') ?? 0) || 0

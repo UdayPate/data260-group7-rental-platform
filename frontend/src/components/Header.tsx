@@ -1,14 +1,13 @@
-import { Link, NavLink, useLocation, useNavigate } from 'react-router'
+import { Link, NavLink, useLocation } from 'react-router'
+import { useAuth } from '../auth/useAuth'
 import { BRAND } from '../brand'
 import { mocksEnabled } from '../config'
-import { useCurrentUser } from '../context/useCurrentUser'
-import { isHostPath } from '../mode'
+import type { Role } from '../types/auth'
 import BrandLogo from './BrandLogo'
 import FilterStrip from './FilterStrip'
 import HostFilterStrip from './HostFilterStrip'
 import SearchBar from './SearchBar'
 import UnreadBadge from './UnreadBadge'
-import UserPicker from './UserPicker'
 
 type NavItem = { to: string; label: string }
 
@@ -29,18 +28,26 @@ const hostNav: NavItem[] = [
   { to: '/dashboards/host', label: 'Dashboards' },
 ]
 
-// Layout (team decision): row 1 = logo, nav, badge, picker, toggle;
-// row 2 = search bar (guest mode); then the cream filter strip (search page, and host "My listings").
+const adminNav: NavItem[] = [
+  { to: '/dashboards/platform', label: 'Platform dashboard' },
+  { to: '/dashboards/ai', label: 'AI dashboard' },
+]
+
+// Logged out: only the public pages (search and property pages).
+const publicNav: NavItem[] = [{ to: '/', label: 'Search' }]
+
+const NAV: Record<Role, NavItem[]> = { guest: guestNav, host: hostNav, admin: adminNav }
+
+// Layout: row 1 = logo, nav, mock badge, who is logged in + Log out (or Log in / Sign up);
+// row 2 = search bar (guests and logged-out visitors); then the cream filter strip
+// (search page, and the host's "My listings").
 function Header() {
   const { pathname, search } = useLocation()
-  const navigate = useNavigate()
-  const { usersVersion, guestId, hostId } = useCurrentUser()
+  const { user, logOut } = useAuth()
 
-  // The mode comes from the URL (see mode.ts). No separate state, so the toggle
-  // and the page can never disagree.
-  const isHost = isHostPath(pathname, search)
-  const navItems = isHost ? hostNav : guestNav
-  const userId = isHost ? hostId : guestId // whose unread messages the badge counts
+  // The role in the token decides everything (no Guest/Host toggle any more).
+  const navItems = user ? NAV[user.role] : publicNav
+  const showSearchBar = !user || user.role === 'guest'
   const onSearchPage = pathname === '/'
 
   return (
@@ -65,7 +72,7 @@ function Header() {
               }
             >
               {item.label}
-              {item.to.endsWith('/messages') && <UnreadBadge key={userId} userId={userId} />}
+              {item.to.endsWith('/messages') && user && <UnreadBadge key={user.id} userId={user.id} />}
             </NavLink>
           ))}
         </nav>
@@ -77,32 +84,36 @@ function Header() {
             </span>
           )}
 
-          {/* key={...} makes React start a fresh picker when the mode or the list of guests changes */}
-          <UserPicker key={`${isHost ? 'host' : 'guest'}-${usersVersion}`} mode={isHost ? 'host' : 'guest'} />
-
-          {/* Guest/Host toggle: switching mode just goes to that area's start page. */}
-          <div className="flex rounded-full bg-surface-2 p-1">
-            <button
-              type="button"
-              aria-pressed={!isHost}
-              onClick={() => navigate('/')}
-              className={`rounded-full px-4 py-1 font-semibold ${!isHost ? 'bg-mustard text-bg' : 'text-fg-muted'}`}
-            >
-              Guest
-            </button>
-            <button
-              type="button"
-              aria-pressed={isHost}
-              onClick={() => navigate('/host/listings')}
-              className={`rounded-full px-4 py-1 font-semibold ${isHost ? 'bg-mustard text-bg' : 'text-fg-muted'}`}
-            >
-              Host
-            </button>
-          </div>
+          {user ? (
+            <>
+              <span data-account className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-fg">{user.name}</span>
+                <span className="rounded-full border border-mustard px-2 py-0.5 font-condensed text-xs font-bold tracking-[0.08em] text-mustard uppercase">
+                  {user.role}
+                </span>
+              </span>
+              <button type="button" onClick={() => logOut()} className="rounded-full border border-line-strong px-4 py-1.5 font-semibold whitespace-nowrap hover:bg-surface">
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                // Come back to this page after logging in (but not to the login/sign-up pages themselves).
+                to={pathname === '/login' || pathname === '/signup' ? '/login' : `/login?next=${encodeURIComponent(pathname + search)}`}
+                className="rounded-full border border-line-strong px-4 py-1.5 font-semibold whitespace-nowrap hover:bg-surface"
+              >
+                Log in
+              </Link>
+              <Link to="/signup" className="rounded-full bg-primary px-4 py-1.5 font-semibold whitespace-nowrap text-on-primary hover:brightness-110">
+                Sign up
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
-      {!isHost && (
+      {showSearchBar && (
         <div className="px-6 pb-4">
           {/* The key changes whenever the search URL changes, so the bar's fields reset to match it. */}
           <SearchBar key={onSearchPage ? search : 'not-search-page'} />

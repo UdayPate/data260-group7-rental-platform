@@ -9,12 +9,14 @@
 // Error codes a service may return, with their HTTP status.
 export type ApiErrorCode =
   | 'VALIDATION_ERROR' // 400
-  | 'UNAUTHORIZED' // 403
+  | 'UNAUTHENTICATED' // 401: no token, or it is invalid or expired (log in again); also a wrong email/password
+  | 'UNAUTHORIZED' // 403: logged in, but not allowed (wrong role, or someone else's data)
   | 'NOT_FOUND' // 404
   | 'DATE_CONFLICT' // 409
   | 'DUPLICATE_BOOKING' // 409
   | 'INVALID_STATUS' // 409: action not allowed in the reservation's current status
   | 'DUPLICATE_REVIEW' // 409: this stay already has a review, or the review already has a reply
+  | 'EMAIL_TAKEN' // 409: another account already uses this email
   | 'SERVICE_UNAVAILABLE' // 503
 
 // Body of every error response.

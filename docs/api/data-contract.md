@@ -26,7 +26,7 @@ Covered so far: **User**, **Property**, **Booking**, **Messaging**, **Review**, 
 | Money | JSON number of **US dollars** (not cents), e.g. `212.5` |
 | Stay dates | `check_out` / `end_date` are **exclusive**: the guest leaves that day. Check-in 12-04 to check-out 12-06 = 2 nights (the 4th and 5th). Two stays overlap only if `a_start < b_end && b_start < a_end`, so back-to-back stays (one checks out the day the next checks in) are allowed. |
 | Nullable fields | Sent as `null`, never left out |
-| Who is acting | There is no login yet. The acting user's ID is sent in the body (`guest_id` / `host_id`), and the service checks it. |
+| Who is acting | Every call sends `Authorization: Bearer <JWT>` (see **Authentication and roles** below). The acting user's ID is **also** still sent in the body (`guest_id` / `host_id`, unchanged), and the service checks that it matches the token. |
 | Success status | `201` for create and `bookings/request`, `200` for everything else |
 
 ---
@@ -51,15 +51,150 @@ Every non-2xx response has this body:
 | `code` | HTTP | When |
 |---|---|---|
 | `VALIDATION_ERROR` | 400 | Missing or invalid field, bad JSON, bad date, check-out not after check-in, over capacity, etc. For missing fields, `details.missing_fields` is the list of names. |
-| `UNAUTHORIZED` | 403 | The acting user isn't allowed to do this (e.g. a host approving another host's reservation) |
+| `UNAUTHENTICATED` | 401 | No token, or the token is invalid or expired. The UI sends the user to the login page. Also: wrong email or password on `/auth/login`. |
+| `UNAUTHORIZED` | 403 | Logged in, but not allowed: wrong role for the endpoint, or the token's user isn't the `guest_id` / `host_id` in the request, or (as before) e.g. a host approving another host's reservation |
 | `NOT_FOUND` | 404 | The ID in the request doesn't exist |
 | `DATE_CONFLICT` | 409 | The requested dates overlap blocked or booked dates |
 | `DUPLICATE_BOOKING` | 409 | The same guest already has an active request for overlapping dates at this property (sent with a different idempotency key). `details.reservation_id` = the existing one. |
 | `INVALID_STATUS` | 409 | The action isn't allowed in the reservation's (or listing's) current status, e.g. approving an already-approved reservation |
 | `DUPLICATE_REVIEW` | 409 | The stay already has a review, or the review already has a host reply |
+| `EMAIL_TAKEN` | 409 | Sign-up (or a profile email change) with an email another account already uses |
 | `SERVICE_UNAVAILABLE` | 503 | The service or a dependency it needs is down |
 
 If a response is not in this shape, the frontend shows a generic "request failed (HTTP 500)" message.
+
+---
+
+## Authentication and roles (for Tanya, Himja, Rohini and Shashank)
+
+Simple email + password login with a JWT. Out of scope: refresh tokens, password reset,
+email verification, OAuth, remember-me, 2FA.
+
+**Accounts.** The User Service keeps a login table: `email` (unique across all accounts,
+case-insensitive), `password_hash`, `role` (`"guest"`, `"host"` or `"admin"`) and `user_id`
+(the `guest_id`, `host_id` or admin id such as `"adm_001"`). One account is one role: a person
+who is both a guest and a host has two accounts. Accounts are created only by `/auth/signup`
+(guest or host); the admin account is seeded. `/guests/create` and `/hosts/create` stay for the
+User Service's own use during sign-up; outside callers get `403`.
+
+**Passwords** are hashed with **bcrypt** (cost 10) and never stored, logged or returned as plain
+text. Deleting a guest profile also deletes its login. Changing a profile email changes the login
+email (`409 EMAIL_TAKEN` if another account has it).
+
+**The token** is a JWT signed with **HS256** (HMAC-SHA-256) using one shared secret, `JWT_SECRET`
+(team decision A3a). Claims (A4a):
+
+| Claim | Value |
+|---|---|
+| `sub` | the user's id: `"g_001"`, `"h_001"` or `"adm_001"` |
+| `role` | `"guest"`, `"host"` or `"admin"` |
+| `name` | display name: guest first + last name, host name, `"Platform Admin"` |
+| `iat` | issued at (seconds since 1970) |
+| `exp` | `iat + 8 hours`, one fixed expiry. No refresh: after 8 hours, log in again. |
+
+**The secret.** The real `JWT_SECRET` goes **only** in each service's `.env` file, which is never
+committed (`.env` is in `.gitignore`). Every service has a committed `.env.example` with a
+placeholder, e.g. `JWT_SECRET=change-me-to-a-long-random-string`; all services share the same
+value. **Never use the frontend mock's development secret** (`DEV_ONLY_JWT_SECRET` in
+`frontend/src/mocks/auth/jwt.ts`) in a real service: it is in frontend code, so anyone can read it
+and forge tokens with it.
+
+**Sending it.** The frontend keeps the token per browser tab (sessionStorage), so two tabs can be
+two different users. It sends it on every HTTP call as `Authorization: Bearer <token>`, and on
+WebSockets (where browsers can't set headers) as `?token=<token>` in the URL. Services must not
+log full URLs with the token in them.
+
+**One shared check in `shared/`** (team decision A5a: the backend team writes it once the backend
+language is settled; the frontend mock's version is `frontend/src/mocks/auth/gate.ts`). Every
+service runs it before the endpoint:
+
+1. Read the token from `Authorization: Bearer` (or `?token=` for a WebSocket). Missing, bad
+   signature, malformed or `exp` passed → **`401 UNAUTHENTICATED`** (WebSocket: close with **`4401`**).
+   Messages: "Please log in to continue." / "Your session has expired. Please log in again."
+2. The token's `role` is not allowed for the endpoint (table below) → **`403 UNAUTHORIZED`**,
+   e.g. "This is only for host accounts. You're logged in as a guest."
+3. Any id field the table marks as "own" (`guest_id`, `host_id`, `actor_id`, `user_id`, `sender_id`,
+   in the body or the query string) is not the token's `sub` → **`403 UNAUTHORIZED`**
+   "You can only do this for your own account."
+4. Then the endpoint's existing checks (e.g. only the listing's host approves) run as before.
+
+**All existing request bodies are unchanged.** The ids stay in the body; the service now also
+checks them against the token.
+
+**Who may call what** (own = that field must be the caller's own id when present):
+
+| Endpoint | Who |
+|---|---|
+| `/auth/signup`, `/auth/login` | public |
+| `/properties/search`, `/properties/get` | public; a `guest_id` or `host_id` sent must be your own |
+| `/properties/availability` `get` | public |
+| WebSocket `/properties/{id}/availability/stream` | public; a `?token=` that is sent must be valid (else close `4401`) |
+| `/hosts/get`, `/reviews/get`, `/reviews/byProperty` | public |
+| `/guests/get` | a guest for themself; a host for a guest who has a reservation at one of their listings |
+| `/guests/update`, `/guests/delete` | guest, own `guest_id` |
+| `/guests/search` | admin |
+| `/guests/create`, `/hosts/create` | nobody from outside (sign-up creates them) |
+| `/hosts/update` | host, own `host_id` |
+| `/properties/create`, `/update`, `/delete`, availability `block` / `unblock` | host, own `host_id` |
+| `/properties/save` | guest, own `guest_id` |
+| `/bookings/request`, `/bookings/byGuest` | guest, own `guest_id` |
+| `/bookings/get` | the reservation's guest, or the host of its listing |
+| `/bookings/byProperty` | host of that listing |
+| `/bookings/approve`, `/bookings/decline` | host, own `host_id` |
+| `/bookings/cancel` | guest (own `guest_id`) or host (own `host_id`) |
+| `/threads/open` | guest or host, own `actor_id` |
+| `/threads/get`, `/threads/byUser`, `/messages/list` | guest or host, own `user_id` |
+| `/messages/send` | guest or host, own `sender_id` |
+| `/reviews/create`, `/reviews/byGuest` | guest, own `guest_id` |
+| `/reviews/respond` | host, own `host_id` |
+| `POST /ai/requests`, `/ai/tasks/{id}/approve`, `/reject` | guest, own `guest_id` |
+| `GET /ai/tasks/{id}`, `GET /ai/results/{id}` | the guest who made the request |
+| WebSocket `/ai/tasks/{id}/stream` | `?token=` required (else close `4401`); only the guest who made the request (else close `4403`) |
+| `POST /events/ingest` | any logged-in user |
+| `GET /analytics/guest/dashboard` | guest, own `guest_id` |
+| `GET /analytics/host/dashboard` | host, own `host_id` |
+| `GET /analytics/funnel` | host (own `host_id`) or admin |
+| `GET /analytics/platform/dashboard`, `/analytics/ai/dashboard`, `/analytics/traces`, `/analytics/traces/{trace_id}`, `/analytics/properties/top`, `/analytics/geo` | **admin only** (`403` otherwise) |
+
+**What each role sees in the UI.** Guest: search, property pages, Trips, Messages, AI Assistant,
+Guest dashboard, Profile. Host: listings, listing form, availability, reservations, messages,
+reviews, Host dashboard. Admin: only the Platform and AI dashboards, with the `trace_id` filter,
+recent traces and journeys. Search and property pages also work logged out.
+
+**Performance tests (JMeter):** every script must first call `POST /auth/login` with a demo account,
+extract `token` from the response (JSON Extractor), and send `Authorization: Bearer ${token}` on
+every request (HTTP Header Manager). Without it, every protected call returns 401 and the numbers
+are meaningless. The token lasts 8 hours, so one login per thread is enough.
+
+**Demo accounts** (seed data; password **`demo1234`** for all of them):
+
+| Role | Name | Email | id |
+|---|---|---|---|
+| admin | Platform Admin | `admin@example.com` | `adm_001` |
+| guest | Alex Chen | `alex.chen@example.com` | `g_001` |
+| guest | Sam Rivera | `sam.rivera@example.com` | `g_002` |
+| guest | Emily Novak | `emily.novak@example.com` | `g_003` |
+| guest | Marcus Johnson | `marcus.johnson@example.com` | `g_004` |
+| guest | Hannah Schmidt | `hannah.schmidt@example.com` | `g_005` |
+| guest | Kenji Watanabe | `kenji.watanabe@example.com` | `g_006` |
+| guest | Olivia Brooks | `olivia.brooks@example.com` | `g_007` |
+| guest | Diego Morales | `diego.morales@example.com` | `g_008` |
+| guest | Fatima Yusuf | `fatima.yusuf@example.com` | `g_009` |
+| guest | Liam O'Connor | `liam.oconnor@example.com` | `g_010` |
+| guest | Zoe Martin | `zoe.martin@example.com` | `g_011` |
+| guest | Ravi Iyer | `ravi.iyer@example.com` | `g_012` |
+| host | Maya Ortiz | `maya.ortiz@example.com` | `h_001` |
+| host | Daniel Kim | `daniel.kim@example.com` | `h_002` |
+| host | Rob Feeney | `rob.feeney@example.com` | `h_003` |
+| host | Priya Raman | `priya.raman@example.com` | `h_004` |
+| host | Luis Herrera | `luis.herrera@example.com` | `h_005` |
+| host | Grace Liu | `grace.liu@example.com` | `h_006` |
+| host | Tom Becker | `tom.becker@example.com` | `h_007` |
+| host | Aisha Bello | `aisha.bello@example.com` | `h_008` |
+
+The bcrypt hash of `demo1234` used by the mock seed (it works in any bcrypt library, so the
+real User Service can seed the same value):
+`$2b$10$94kmkeOHle3c5ei7/9TY9elQtClBvjpgO7QGQdvBBAhl9sRjzeava`
 
 ---
 
@@ -207,6 +342,7 @@ Any block whose status is not `"available"` makes those nights unavailable.
 | reservation_id | string | |
 | property_id | string | |
 | guest_id | string | |
+| guest_name | string | **Added with login:** the guest's display name ("Alex Chen"), copied in when the review is created (like a Thread's `guest_name`). Reviews are public, but guest profiles (`/guests/get`, with email and phone) are not, so this is how a property page shows who wrote each review. |
 | host_id | string | |
 | rating | number | whole number 1–5 |
 | review_text | string | |
@@ -229,6 +365,8 @@ Non-paged lists use `{ "items": [ ... ] }`.
 
 | Endpoint | Request body | Response |
 |---|---|---|
+| `POST /auth/signup` | Guest: `{ "role": "guest", "email", "password", "first_name", "last_name", "phone", "location" }`. Host: `{ "role": "host", "email", "password", "name", "phone" }`. No admin sign-up. | `201 { "token", "user": { "id", "role", "name" } }`, already logged in. `400` validation (password under 8 characters, bad email, missing field, role not guest/host), `409 EMAIL_TAKEN`. |
+| `POST /auth/login` | `{ "email", "password" }` (email compared ignoring upper/lower case) | `{ "token", "user": { "id", "role", "name" } }`. `401 UNAUTHENTICATED` "Wrong email or password." for both an unknown email and a wrong password. |
 | `POST /guests/create` | Guest **without** `guest_id`, `saved_properties_count`, `booking_count`, `profile_created_datetime` | `201` Guest |
 | `POST /guests/get` | `{ "guest_id" }` | Guest |
 | `POST /guests/update` | `{ "guest_id", ...only the fields being changed }` | updated Guest |

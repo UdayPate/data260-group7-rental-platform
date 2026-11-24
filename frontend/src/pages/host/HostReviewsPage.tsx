@@ -1,12 +1,11 @@
 // Host: reviews of my listings (T3a). Tabs "Needs a reply" / "All", a listing filter,
 // and an inline reply (once per review; the server enforces it).
-// Loads the host's listings, then /reviews/byProperty for each, then guest names.
+// Loads the host's listings, then /reviews/byProperty for each (reviews carry the guest's name).
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { errorMessage } from '../../api/client'
 import { searchProperties } from '../../api/properties'
 import { respondToReview, reviewsByProperty } from '../../api/reviews'
-import { loadGuestNames } from '../../api/users'
 import ErrorBanner from '../../components/ErrorBanner'
 import { StarRating } from '../../components/Stars'
 import { useCurrentUser } from '../../context/useCurrentUser'
@@ -27,7 +26,6 @@ function HostReviews({ hostId, onReload }: { hostId: string; onReload: () => voi
 
   const [listings, setListings] = useState<Property[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
-  const [names, setNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,11 +36,9 @@ function HostReviews({ hostId, onReload }: { hostId: string; onReload: () => voi
         const mine = await searchProperties({ host_id: hostId, page: 1, page_size: 100 })
         const pages = await Promise.all(mine.items.map((p) => reviewsByProperty({ property_id: p.property_id, page: 1, page_size: 100 })))
         const all = pages.flatMap((p) => p.items).sort((a, b) => b.created_datetime.localeCompare(a.created_datetime))
-        const guestNames = await loadGuestNames(all.map((r) => r.guest_id))
         if (ignore) return
         setListings(mine.items)
         setReviews(all)
-        setNames(guestNames)
         setLoading(false)
       } catch (err) {
         if (ignore) return
@@ -124,7 +120,7 @@ function HostReviews({ hostId, onReload }: { hostId: string; onReload: () => voi
       <ul className="space-y-4">
         {!loading &&
           shown.map((r) => (
-            <HostReviewCard key={r.review_id} review={r} hostId={hostId} guestName={names[r.guest_id] ?? 'Former guest'} listingTitle={titleOf(r.property_id)} onReplied={replaced} />
+            <HostReviewCard key={r.review_id} review={r} hostId={hostId} guestName={r.guest_name} listingTitle={titleOf(r.property_id)} onReplied={replaced} />
           ))}
       </ul>
     </section>

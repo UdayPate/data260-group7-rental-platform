@@ -46,11 +46,14 @@ export const reviewHandlers = [
     const property = db.properties.find((p) => p.property_id === reservation.property_id)
     if (!property) return errorResponse('NOT_FOUND', 'This listing no longer exists, so it can’t be reviewed.')
 
+    const guest = db.guests.find((g) => g.guest_id === reservation.guest_id)
+    const guestName = guest ? `${guest.first_name} ${guest.last_name}` : 'Former guest'
     const review: Review = {
       review_id: nextId('v', db.reviews.map((r) => r.review_id)),
       reservation_id: reservation.reservation_id,
       property_id: property.property_id,
       guest_id: reservation.guest_id,
+      guest_name: guestName,
       host_id: property.host_id,
       rating: body.rating as number,
       review_text: String(body.review_text).trim(),

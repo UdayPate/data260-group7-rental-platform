@@ -1,4 +1,5 @@
 // Analytics & Logging Service: POST /events/ingest and GET /analytics/*
+import { currentToken } from '../auth/session'
 import { apiBaseUrls } from '../config'
 import type {
   AiDashboard,
@@ -57,6 +58,9 @@ export function trackEvent(
   payload: Record<string, unknown> = {},
   traceId: string = crypto.randomUUID(),
 ) {
+  // Only logged-in users send events (the ingest endpoint needs a token). A logged-out
+  // visitor's page views are simply not counted.
+  if (!currentToken() || !actorId) return // no token, or not a guest (e.g. a host browsing): nothing to record
   const envelope: EventEnvelope = {
     event_type: eventType,
     trace_id: traceId,

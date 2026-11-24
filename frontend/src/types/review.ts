@@ -4,6 +4,7 @@ export type Review = {
   reservation_id: string
   property_id: string
   guest_id: string
+  guest_name: string // "Alex Chen", copied in when the review is created, so anyone can see who wrote it
   host_id: string
   rating: number // whole number 1-5
   review_text: string

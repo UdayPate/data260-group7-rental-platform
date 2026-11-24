@@ -8,7 +8,7 @@ import { mocksEnabled } from './config'
 
 // Browser tab title from brand.ts (index.html only has a neutral placeholder).
 document.title = BRAND_TITLE
-import { CurrentUserProvider } from './context/CurrentUserContext'
+import { AuthProvider } from './auth/AuthProvider'
 
 // When mocks are on, start MSW (Mock Service Worker) before the app renders, so even
 // the very first API call is answered by the mocks. When off, the mock code is never loaded.
@@ -24,10 +24,10 @@ startMocks().then(() => {
     <StrictMode>
       {/* BrowserRouter keeps the page in sync with the address bar URL */}
       <BrowserRouter>
-        {/* Makes the current demo guest/host available to every page */}
-        <CurrentUserProvider>
+        {/* Who is logged in (in this tab), for every page */}
+        <AuthProvider>
           <App />
-        </CurrentUserProvider>
+        </AuthProvider>
       </BrowserRouter>
     </StrictMode>,
   )

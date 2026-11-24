@@ -7,6 +7,7 @@ import type { Host } from '../types/host'
 import type { Property } from '../types/property'
 import type { PriceBreakdown, Reservation } from '../types/reservation'
 import type { Review } from '../types/review'
+import { seedAccounts, type Account } from './data/accounts'
 import { seedHostBlocks } from './data/availability'
 import { seedGuests } from './data/guests'
 import { seedHosts } from './data/hosts'
@@ -50,8 +51,6 @@ const properties: Property[] = structuredClone(seedProperties)
 const hosts: Host[] = structuredClone(seedHosts)
 // Seed saves get times spread over the last weeks (for the saved-activity chart).
 const saved: SavedProperty[] = structuredClone(seedSaved).map((s, i) => ({ ...s, saved_datetime: s.saved_datetime ?? daysAgoDatetime(2 + i * 4) }))
-// Recent reviews plus the older San Jose stays' reviews (data/pastStays.ts).
-const reviews: Review[] = structuredClone([...seedReviews, ...pastStayReviews])
 
 const reservations: Reservation[] = [...seedReservations, ...pastStayReservations].map((seed) => {
   const property = properties.find((p) => p.property_id === seed.property_id)!
@@ -86,6 +85,13 @@ for (const reservation of reservations.filter(holdsDates)) {
   bookingBlockIds.set(reservation.reservation_id, availabilityId)
 }
 
+// Recent reviews plus the older San Jose stays' reviews (data/pastStays.ts), with the
+// reviewer's display name copied in (public, so nobody needs to read the guest's profile).
+const reviews: Review[] = structuredClone([...seedReviews, ...pastStayReviews]).map((r) => {
+  const guest = guests.find((g) => g.guest_id === r.guest_id)!
+  return { ...r, guest_name: `${guest.first_name} ${guest.last_name}` }
+})
+
 // Threads get the display names copied in from the guest, host and listing (C2a).
 const threads: Thread[] = seedThreads.map((t) => {
   const guest = guests.find((g) => g.guest_id === t.guest_id)!
@@ -99,6 +105,7 @@ const threads: Thread[] = seedThreads.map((t) => {
 const messages: Message[] = structuredClone(seedMessages)
 
 export const db = {
+  accounts: structuredClone(seedAccounts) as Account[], // logins (User Service)
   hosts,
   guests,
   properties,

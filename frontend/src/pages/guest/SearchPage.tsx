@@ -1,10 +1,11 @@
 // Guest search results. The filters come from the URL (set by the header search bar
 // and the cream filter strip); this page asks the Property Service and shows the cards.
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { trackEvent } from '../../api/analytics'
 import { errorMessage } from '../../api/client'
 import { saveProperty, searchProperties } from '../../api/properties'
+import { useAuth } from '../../auth/useAuth'
 import ErrorBanner from '../../components/ErrorBanner'
 import ListingCard from '../../components/ListingCard'
 import { useCurrentUser } from '../../context/useCurrentUser'
@@ -38,6 +39,9 @@ function SearchPage() {
 type ResultsProps = { paramsString: string; guestId: string }
 
 function SearchResults({ paramsString, guestId }: ResultsProps) {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const filters = readFilters(new URLSearchParams(paramsString))
 
   const [items, setItems] = useState<PropertySearchResult[]>([])
@@ -96,6 +100,11 @@ function SearchResults({ paramsString, guestId }: ResultsProps) {
 
   // Heart click: wait for the server, then show what it says (team decision: no optimistic update).
   async function toggleSave(property: PropertySearchResult) {
+    // Logged out: saving needs an account, so log in first and come back here.
+    if (!user) {
+      navigate(`/login?next=${encodeURIComponent(location.pathname + location.search)}`)
+      return
+    }
     setSaveError(null)
     setSavingIds((ids) => [...ids, property.property_id])
     try {
@@ -163,7 +172,8 @@ function SearchResults({ paramsString, guestId }: ResultsProps) {
               key={property.property_id}
               property={property}
               saving={savingIds.includes(property.property_id)}
-              onToggleSave={() => toggleSave(property)}
+              // Guests and logged-out visitors get the heart; hosts and the admin don't.
+              onToggleSave={!user || user.role === 'guest' ? () => toggleSave(property) : undefined}
               linkQuery={linkQuery}
             />
           ))}

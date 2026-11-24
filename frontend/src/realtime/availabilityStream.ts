@@ -6,6 +6,7 @@
 // - Repeats (same idempotency_key) are dropped.
 // - If the socket drops, it keeps retrying (1 s, 2 s, 4 s, then every 8 s). Each time it
 //   opens, the page re-reads the calendar (R7a), so nothing missed while it was down is lost.
+import { currentToken, endSession } from '../auth/session'
 import { apiBaseUrls } from '../config'
 import type { AvailabilityEvent } from '../types/availability'
 
@@ -24,7 +25,10 @@ const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000] // the last one repeats
 function streamUrl(propertyId: string): string {
   const httpBase = apiBaseUrls.properties || window.location.origin
   const wsBase = httpBase.replace(/^http/, 'ws') // http -> ws, https -> wss
-  return `${wsBase}/properties/${encodeURIComponent(propertyId)}/availability/stream`
+  const url = `${wsBase}/properties/${encodeURIComponent(propertyId)}/availability/stream`
+  // Public stream, but a logged-in tab sends its token (in the URL: WebSockets can't send headers).
+  const token = currentToken()
+  return token ? `${url}?token=${encodeURIComponent(token)}` : url
 }
 
 // Basic shape check before we trust a message.
@@ -87,6 +91,8 @@ export function openAvailabilityStream(options: Options): () => void {
 
     socket.onclose = (event) => {
       if (stopped) return
+      // 4401 = invalid or expired token: back to the login page.
+      if (event.code === 4401) endSession()
       // 4000+ = the server refused (e.g. 4404 unknown property): retrying won't help.
       if (event.code >= 4000) {
         options.onStatus('closed')

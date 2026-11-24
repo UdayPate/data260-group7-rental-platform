@@ -4,11 +4,12 @@
 // The calendar stays live over a WebSocket (spec 13.4): nights another guest takes turn
 // unavailable without a refresh, and the booking panel stops a stale request.
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router'
 import { trackEvent } from '../../api/analytics'
 import { errorMessage } from '../../api/client'
 import { getAvailability, getProperty, saveProperty } from '../../api/properties'
 import { getHost } from '../../api/users'
+import { useAuth } from '../../auth/useAuth'
 import { applyAvailabilityEvent } from '../../availability'
 import AvailabilityCalendar from '../../components/AvailabilityCalendar'
 import MessageButton from '../../components/MessageButton'
@@ -19,7 +20,7 @@ import { LiveStatusPill, LiveUpdatesLog } from '../../components/LiveUpdates'
 import { HeartIcon, HouseIcon, StarIcon } from '../../components/icons'
 import { useCurrentUser } from '../../context/useCurrentUser'
 import { dateString, localDate } from '../../dates'
-import { AMENITY_LABELS, PROPERTY_TYPE_LABELS, plural } from '../../labels'
+import { AMENITY_LABELS, formatPrice, PROPERTY_TYPE_LABELS, plural } from '../../labels'
 import { useAvailabilityStream } from '../../realtime/useAvailabilityStream'
 import type { AvailabilityBlock } from '../../types/availability'
 import type { Host } from '../../types/host'
@@ -55,6 +56,8 @@ type DetailsProps = { propertyId: string; guestId: string }
 
 function PropertyDetails({ propertyId, guestId }: DetailsProps) {
   const [searchParams] = useSearchParams()
+  const { user } = useAuth()
+  const location = useLocation()
 
   const [property, setProperty] = useState<PropertyWithSaved | null>(null)
   const [host, setHost] = useState<Host | null>(null)
@@ -79,7 +82,8 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
     let ignore = false
     async function load() {
       try {
-        const loadedProperty = await getProperty({ property_id: propertyId, guest_id: guestId })
+        // guest_id only for a logged-in guest (it fills the "Saved" heart).
+        const loadedProperty = await getProperty({ property_id: propertyId, guest_id: guestId || undefined })
         const range = calendarRange()
         const [loadedHost, availability] = await Promise.all([
           getHost({ host_id: loadedProperty.host_id }),
@@ -179,6 +183,16 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
 
   const typeLabel = PROPERTY_TYPE_LABELS[property.property_type]
 
+  // Who may book, save and message: guests. Logged-out visitors are asked to log in
+  // (and come back here with the dates they picked); hosts and the admin just browse.
+  const isGuest = user?.role === 'guest'
+  const backHere = new URLSearchParams()
+  if (checkIn) backHere.set('check_in', checkIn)
+  if (checkOut) backHere.set('check_out', checkOut)
+  backHere.set('guests', String(guests))
+  const nextPath = encodeURIComponent(`${location.pathname}?${backHere.toString()}`)
+  const loginLink = `/login?next=${nextPath}`
+
   // The newest live update that took any of the picked nights (and is still in the calendar).
   const liveClash =
     checkIn && checkOut
@@ -212,16 +226,23 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
           <div className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <h1 className="font-display text-4xl font-bold">{property.title}</h1>
-              <button
-                type="button"
-                onClick={toggleSave}
-                disabled={saving}
-                aria-pressed={property.is_saved}
-                className="flex items-center gap-2 rounded-full border border-line-strong px-4 py-2 font-semibold hover:bg-surface disabled:cursor-wait disabled:opacity-60"
-              >
-                <HeartIcon filled={property.is_saved} className={`h-5 w-5 ${property.is_saved ? 'text-primary' : ''}`} />
-                {property.is_saved ? 'Saved' : 'Save'}
-              </button>
+              {isGuest && (
+                <button
+                  type="button"
+                  onClick={toggleSave}
+                  disabled={saving}
+                  aria-pressed={property.is_saved}
+                  className="flex items-center gap-2 rounded-full border border-line-strong px-4 py-2 font-semibold hover:bg-surface disabled:cursor-wait disabled:opacity-60"
+                >
+                  <HeartIcon filled={property.is_saved} className={`h-5 w-5 ${property.is_saved ? 'text-primary' : ''}`} />
+                  {property.is_saved ? 'Saved' : 'Save'}
+                </button>
+              )}
+              {!user && (
+                <Link to={loginLink} className="flex items-center gap-2 rounded-full border border-line-strong px-4 py-2 font-semibold hover:bg-surface">
+                  <HeartIcon className="h-5 w-5" /> Log in to save
+                </Link>
+              )}
             </div>
             <p className="flex flex-wrap items-center gap-x-2 text-fg-soft">
               <StarIcon className="h-4 w-4 text-mustard" />
@@ -258,11 +279,18 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
             <p className="text-sm text-fg-soft sm:ml-auto">
               Replies to {host.response_rate}% of messages, in {formatResponseTime(host.response_time)}
             </p>
-            <MessageButton
-              label="Message host"
-              inbox="/guest/messages"
-              request={{ guest_id: guestId, host_id: host.host_id, property_id: property.property_id, actor_id: guestId }}
-            />
+            {isGuest && (
+              <MessageButton
+                label="Message host"
+                inbox="/guest/messages"
+                request={{ guest_id: guestId, host_id: host.host_id, property_id: property.property_id, actor_id: guestId }}
+              />
+            )}
+            {!user && (
+              <Link to={loginLink} className="rounded-full border border-line-strong px-4 py-1.5 text-sm font-semibold hover:bg-surface">
+                Log in to message the host
+              </Link>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -302,18 +330,43 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
 
         {/* ---------- Right column: booking panel, stays in view while scrolling ---------- */}
         <div className="lg:sticky lg:top-6 lg:self-start">
-          <BookingPanel
-            property={property}
-            blocks={blocks}
-            guestId={guestId}
-            checkIn={checkIn}
-            checkOut={checkOut}
-            guests={Math.min(guests, property.capacity)}
-            onCheckInChange={setCheckIn}
-            onCheckOutChange={setCheckOut}
-            onGuestsChange={setGuests}
-            liveClash={liveClash}
-          />
+          {isGuest ? (
+            <BookingPanel
+              property={property}
+              blocks={blocks}
+              guestId={guestId}
+              checkIn={checkIn}
+              checkOut={checkOut}
+              guests={Math.min(guests, property.capacity)}
+              onCheckInChange={setCheckIn}
+              onCheckOutChange={setCheckOut}
+              onGuestsChange={setGuests}
+              liveClash={liveClash}
+            />
+          ) : (
+            <div data-login-to-book className="space-y-4 rounded-2xl border border-line bg-surface p-5">
+              <p>
+                <span className="font-condensed text-3xl font-bold">{formatPrice(property.nightly_price)}</span>{' '}
+                <span className="text-fg-muted">/ night</span>
+              </p>
+              {user ? (
+                <p className="text-sm text-fg-soft">Only guest accounts can book stays. You’re logged in as {user.role === 'admin' ? 'the admin' : `a ${user.role}`}.</p>
+              ) : (
+                <>
+                  <p className="text-sm text-fg-soft">Pick your nights in the calendar, then log in to send a booking request.</p>
+                  <Link to={loginLink} className="block w-full rounded-full bg-primary py-3 text-center font-semibold text-on-primary hover:brightness-110">
+                    Log in to book
+                  </Link>
+                  <p className="text-center text-sm text-fg-muted">
+                    New here?{' '}
+                    <Link to={`/signup?next=${nextPath}`} className="font-semibold text-primary hover:underline">
+                      Create an account
+                    </Link>
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </section>

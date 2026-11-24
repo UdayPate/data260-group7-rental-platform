@@ -1,5 +1,5 @@
 // Dashboard filters live in the URL (team decision U2a): ?days=7|30|90&trace_id=...
-// plus ?as=host on the Platform and AI dashboards when you came from host mode (U3a).
+// (?trace_id is used by the admin's Platform and AI dashboards only.)
 export const DAY_OPTIONS = [7, 30, 90] as const
 
 export type DashboardFilters = { days: number; traceId: string | null }

@@ -7,6 +7,7 @@
 // - duplicates (seq we already have) are dropped.
 // - each event's receive time is logged next to its server timestamp, to measure
 //   WebSocket delivery latency (spec section 9).
+import { currentToken, endSession } from '../auth/session'
 import { apiBaseUrls } from '../config'
 import type { StreamEvent } from '../types/ai'
 
@@ -27,7 +28,9 @@ const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000] // then give up
 function streamUrl(taskId: string, afterSeq: number): string {
   const httpBase = apiBaseUrls.ai || window.location.origin
   const wsBase = httpBase.replace(/^http/, 'ws') // http -> ws, https -> wss
-  return `${wsBase}/ai/tasks/${encodeURIComponent(taskId)}/stream?after_seq=${afterSeq}`
+  // Browsers can't send headers on a WebSocket, so the login token goes in the URL.
+  const token = encodeURIComponent(currentToken() ?? '')
+  return `${wsBase}/ai/tasks/${encodeURIComponent(taskId)}/stream?after_seq=${afterSeq}&token=${token}`
 }
 
 // Basic shape check before we trust a message.
@@ -96,6 +99,8 @@ export function openAiStream(options: Options): () => void {
 
     socket.onclose = (event) => {
       if (stopped) return
+      // 4401 = missing, invalid or expired token: back to the login page.
+      if (event.code === 4401) endSession()
       // 1000 = the server finished the stream on purpose (debate over);
       // 4000+ = the server refused it (e.g. 4404 unknown task). Don't retry those.
       if (event.code === 1000 || event.code >= 4000 || attempt >= RETRY_DELAYS_MS.length) {

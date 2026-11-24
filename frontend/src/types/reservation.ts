@@ -25,7 +25,7 @@ export type Reservation = {
 }
 
 // --- Request bodies (Booking Service, /bookings/*) ---
-// There's no login yet, so the acting user's id is sent in the body.
+// The acting user's id is sent in the body, and the service checks it matches the login token.
 // idempotency_key: a new random id per user action; resending the same key returns the first result.
 
 export type RequestBookingRequest = {

@@ -8,12 +8,14 @@ export const MOCK_DELAY_MS = 400
 // Status code for each error code (matches docs/api/data-contract.md).
 const STATUS_FOR_CODE: Record<ApiErrorCode, number> = {
   VALIDATION_ERROR: 400,
+  UNAUTHENTICATED: 401,
   UNAUTHORIZED: 403,
   NOT_FOUND: 404,
   DATE_CONFLICT: 409,
   DUPLICATE_BOOKING: 409,
   INVALID_STATUS: 409,
   DUPLICATE_REVIEW: 409,
+  EMAIL_TAKEN: 409,
   SERVICE_UNAVAILABLE: 503,
 }
 
@@ -23,13 +25,21 @@ export function errorResponse(code: ApiErrorCode, message: string, details?: Rec
 }
 
 // Reads the JSON body as a plain object, or null if it isn't valid JSON / isn't an object.
+// A body can only be read once, and MSW gives every handler the same request, so the first
+// reader (the auth gate) keeps the result here and later readers reuse it.
+const parsedBodies = new WeakMap<Request, Record<string, unknown> | null>()
+
 export async function readBody(request: Request): Promise<Record<string, unknown> | null> {
+  if (parsedBodies.has(request)) return parsedBodies.get(request)!
+  let result: Record<string, unknown> | null = null
   try {
     const body: unknown = await request.json()
-    return typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : null
+    if (typeof body === 'object' && body !== null && !Array.isArray(body)) result = body as Record<string, unknown>
   } catch {
-    return null
+    // not JSON: result stays null
   }
+  parsedBodies.set(request, result)
+  return result
 }
 
 // Returns a 400 response if any listed field is missing or empty, otherwise null.

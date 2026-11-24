@@ -1,9 +1,11 @@
 // All mock handlers, in one list. MSW tries them in order and uses the first match.
 import { http } from 'msw'
+import { authGate } from '../auth/gate'
 import { runBookingJob } from '../db'
 import { errorResponse } from '../responses'
 import { aiHandlers } from './ai'
 import { analyticsHandlers } from './analytics'
+import { authHandlers } from './auth'
 import { availabilityStreamHandler } from './availability'
 import { bookingHandlers } from './bookings'
 import { messagingHandlers } from './messaging'
@@ -12,7 +14,11 @@ import { reviewHandlers } from './reviews'
 import { userHandlers } from './users'
 
 export const handlers = [
-  // First: before every API call (all POSTs, plus the analytics GETs), run the Booking
+  // First of all: the token check (401 / 403) in front of every endpoint, like the
+  // shared helper each real service runs. See mocks/auth/gate.ts.
+  authGate,
+
+  // Then: before every API call (all POSTs, plus the analytics GETs), run the Booking
   // Service's "daily job" (complete finished stays, expire old pending requests).
   // Returning nothing lets MSW carry on to the real handler below.
   http.post('*', () => {
@@ -22,6 +28,7 @@ export const handlers = [
     runBookingJob()
   }),
 
+  ...authHandlers,
   ...userHandlers,
   ...propertyHandlers,
   availabilityStreamHandler,

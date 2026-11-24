@@ -3,7 +3,7 @@
 // Alex (g_001) has none here, so his demo story is unchanged. Stays start 120+ days ago
 // and are spaced so no two overlap on the same listing. The listing's rating/review_count
 // in properties.ts is still its whole history ("Showing N of M" on the property page).
-import type { Review } from '../../types/review'
+import type { SeedReview } from './reviews'
 import { daysAgoDatetime, daysFromToday } from '../dates'
 import { seedProperties } from './properties'
 import type { SeedReservation } from './reservations'
@@ -145,7 +145,7 @@ export const pastStayReservations: SeedReservation[] = STAYS.map((s) => ({
   guest_message: null,
 }))
 
-export const pastStayReviews: Review[] = STAYS.map((s) => ({
+export const pastStayReviews: SeedReview[] = STAYS.map((s) => ({
   review_id: s.reviewId,
   reservation_id: s.reservationId,
   property_id: s.propertyId,

@@ -11,9 +11,8 @@ import { Link, useLocation, useSearchParams } from 'react-router'
 import { describeEvent, TASK_STATUS_TEXT } from '../../aiDebate'
 import { approveAiResult, createAiRequest, rejectAiResult } from '../../api/ai'
 import { errorMessage } from '../../api/client'
-import { useCurrentUser } from '../../context/useCurrentUser'
+import { useAuth } from '../../auth/useAuth'
 import { AMENITY_LABELS, PROPERTY_TYPE_LABELS, formatPrice } from '../../labels'
-import { isHostPath } from '../../mode'
 import { useAiTask } from '../../realtime/useAiTask'
 import { describeFiltersForAi, readFilters } from '../../searchFilters'
 import ErrorBanner from '../ErrorBanner'
@@ -23,7 +22,8 @@ import { AgentStrip } from './DebateParts'
 function AssistantLauncher() {
   const { pathname, search } = useLocation()
   const [searchParams] = useSearchParams()
-  const { guestId } = useCurrentUser()
+  const { user } = useAuth()
+  const guestId = user?.role === 'guest' ? user.id : ''
 
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
@@ -42,10 +42,16 @@ function AssistantLauncher() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open])
 
-  // Guest pages only, and not on the AI pages themselves (D1a), nor on Messages, where it
-  // would sit on top of the message box. Returning null keeps this component (and its
-  // state) alive, so the task is still here when you come back.
-  const hidden = isHostPath(pathname, search) || pathname.startsWith('/ai') || pathname === '/guest/messages'
+  // For guests and logged-out visitors (who are asked to log in), never for hosts or the
+  // admin. Not on the AI pages themselves (D1a), on Messages (it would cover the message
+  // box), or on the login pages. Returning null keeps this component (and its state)
+  // alive, so the task is still here when you come back.
+  const hidden =
+    (user !== null && user.role !== 'guest') ||
+    pathname.startsWith('/ai') ||
+    pathname === '/guest/messages' ||
+    pathname === '/login' ||
+    pathname === '/signup'
   if (hidden) return null
 
   const onSearchPage = pathname === '/'
@@ -98,7 +104,14 @@ function AssistantLauncher() {
           </button>
         </div>
 
-        {taskId === null ? (
+        {!user ? (
+          <p className="text-sm text-fg-soft">
+            The AI assistant finds stays for you by letting several agents debate your request.{' '}
+            <Link to={`/login?next=${encodeURIComponent(pathname + search)}`} className="font-semibold text-primary hover:underline">
+              Log in to use it
+            </Link>
+          </p>
+        ) : taskId === null ? (
           <form onSubmit={submit} className="space-y-3">
             <textarea
               value={text}

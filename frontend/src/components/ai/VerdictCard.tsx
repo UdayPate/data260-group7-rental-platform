@@ -170,7 +170,7 @@ function VerdictCard({ taskId, guestId, result, decision, canAct, onDecided }: P
       )}
 
       {!decision && rec && !canAct && (
-        <p className="text-sm text-fg-muted">This request belongs to another guest. Switch “Viewing as” to approve or reject it.</p>
+        <p className="text-sm text-fg-muted">This request belongs to another guest. Only they can approve or reject it.</p>
       )}
 
       {!decision && rec && canAct && mode === 'idle' && (

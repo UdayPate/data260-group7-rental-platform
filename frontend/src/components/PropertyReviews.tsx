@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react'
 import { errorMessage } from '../api/client'
 import { reviewsByProperty } from '../api/reviews'
-import { loadGuestNames } from '../api/users'
 import { formatDate } from '../dates'
 import { plural } from '../labels'
 import type { Review } from '../types/review'
@@ -19,7 +18,6 @@ type Props = { propertyId: string; rating: number; reviewCount: number }
 function PropertyReviews({ propertyId, rating, reviewCount }: Props) {
   const [reviews, setReviews] = useState<Review[]>([])
   const [total, setTotal] = useState(0) // full reviews available from the Review Service
-  const [names, setNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1) // pages loaded so far; bump to load more
@@ -29,11 +27,9 @@ function PropertyReviews({ propertyId, rating, reviewCount }: Props) {
     async function load() {
       try {
         const result = await reviewsByProperty({ property_id: propertyId, page, page_size: PAGE_SIZE })
-        const guestNames = await loadGuestNames(result.items.map((r) => r.guest_id))
         if (ignore) return
         // Page 1 replaces the list, later pages add to it.
         setReviews((prev) => (page === 1 ? result.items : [...prev, ...result.items]))
-        setNames((prev) => ({ ...prev, ...guestNames }))
         setTotal(result.total)
         setLoading(false)
       } catch (err) {
@@ -82,7 +78,7 @@ function PropertyReviews({ propertyId, rating, reviewCount }: Props) {
           <li key={r.review_id} className="space-y-2 rounded-2xl border border-line bg-surface p-4">
             <div className="flex flex-wrap items-center gap-3">
               <StarRating value={r.rating} />
-              <span className="font-semibold">{names[r.guest_id] ?? 'Former guest'}</span>
+              <span className="font-semibold">{r.guest_name}</span>
               <span className="text-sm text-fg-muted">{formatDate(r.created_datetime.slice(0, 10))}</span>
             </div>
             <p className="text-fg-soft">{r.review_text}</p>

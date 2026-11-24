@@ -1,11 +1,12 @@
 // Guest profile (P1a): a view card -> Edit turns it into the form -> Save / Cancel.
 // Delete has a confirm step; the server refuses while the guest has upcoming trips (C5a).
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router'
+import { useLocation } from 'react-router'
 import { ApiError, errorMessage } from '../../api/client'
 import { deleteGuest, getGuest, updateGuest } from '../../api/users'
 import ErrorBanner from '../../components/ErrorBanner'
 import GuestProfileForm from '../../components/GuestProfileForm'
+import { useAuth } from '../../auth/useAuth'
 import { useCurrentUser } from '../../context/useCurrentUser'
 import { formatDate } from '../../dates'
 import { AMENITY_LABELS, PROPERTY_TYPE_LABELS, formatPrice, plural } from '../../labels'
@@ -17,9 +18,8 @@ function GuestProfilePage() {
 }
 
 function GuestProfile({ guestId }: { guestId: string }) {
-  const navigate = useNavigate()
   const location = useLocation()
-  const { refreshUsers } = useCurrentUser()
+  const { logOut } = useAuth()
   const [notice, setNotice] = useState<string | null>((location.state as { notice?: string } | null)?.notice ?? null)
 
   const [guest, setGuest] = useState<Guest | null>(null)
@@ -56,8 +56,8 @@ function GuestProfile({ guestId }: { guestId: string }) {
     setDeleteError(null)
     try {
       await deleteGuest({ guest_id: guest.guest_id })
-      refreshUsers() // the "Viewing as" list reloads and moves to the next guest
-      navigate('/', { state: { notice: `Deleted the profile of ${guest.first_name} ${guest.last_name}.` } })
+      // The login was deleted with the profile, so log out of this tab.
+      logOut(`Deleted the profile of ${guest.first_name} ${guest.last_name}. You’ve been logged out.`)
     } catch (err) {
       // "Upcoming trips" error: the server also lists which reservations.
       const ids = err instanceof ApiError ? err.details?.reservation_ids : undefined
@@ -65,12 +65,6 @@ function GuestProfile({ guestId }: { guestId: string }) {
       setDeleting(false)
     }
   }
-
-  const newProfileLink = (
-    <Link to="/guest/profile/new" className="text-sm font-semibold text-primary hover:underline">
-      Create a new guest profile
-    </Link>
-  )
 
   if (loading) return <p className="text-fg-muted">Loading your profile…</p>
   if (error || !guest) {
@@ -84,7 +78,6 @@ function GuestProfile({ guestId }: { guestId: string }) {
             setAttempt((n) => n + 1)
           }}
         />
-        {newProfileLink}
       </section>
     )
   }
@@ -96,7 +89,6 @@ function GuestProfile({ guestId }: { guestId: string }) {
     <section className="max-w-3xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="font-display text-4xl font-bold">{editing ? 'Edit profile' : 'My profile'}</h1>
-        {!editing && newProfileLink}
       </div>
 
       {notice && (
@@ -118,7 +110,6 @@ function GuestProfile({ guestId }: { guestId: string }) {
             setGuest(updated)
             setEditing(false)
             setNotice('Profile saved.')
-            refreshUsers() // the name in "Viewing as" may have changed
           }}
         />
       ) : (

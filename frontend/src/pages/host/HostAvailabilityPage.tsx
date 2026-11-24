@@ -149,7 +149,7 @@ function HostAvailability({ propertyId, hostId }: Props) {
         {backLink}
         <div className="rounded-2xl border border-line bg-surface p-6">
           <p className="text-fg-soft">This listing belongs to another host.</p>
-          <p className="mt-1 text-sm text-fg-muted">Switch “Viewing as” in the header to its host to manage its calendar.</p>
+          <p className="mt-1 text-sm text-fg-muted">Log in as its host to manage its calendar.</p>
         </div>
       </section>
     )

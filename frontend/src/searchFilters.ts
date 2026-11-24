@@ -94,7 +94,7 @@ export function toSearchRequest(
     amenities: filters.amenities.length > 0 ? filters.amenities : undefined,
     min_rating: filters.min_rating ?? undefined,
     available_only: filters.available_only || undefined,
-    guest_id: guestId,
+    guest_id: guestId || undefined, // logged out (or not a guest): no "saved" hearts to fill
     page,
     page_size: pageSize,
   }
