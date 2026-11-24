@@ -1,14 +1,8 @@
-import PlaceholderPage from '../../components/PlaceholderPage'
+import MessagesPage from '../MessagesPage'
 
+// Guest inbox: conversations with hosts.
 function GuestMessagesPage() {
-  return (
-    <PlaceholderPage
-      title="Messages"
-      specItems={[
-        'Conversations with hosts: send and receive messages',
-      ]}
-    />
-  )
+  return <MessagesPage role="guest" />
 }
 
 export default GuestMessagesPage

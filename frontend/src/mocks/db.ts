@@ -14,7 +14,10 @@ import { seedProperties } from './data/properties'
 import { seedReservations } from './data/reservations'
 import { seedReviews } from './data/reviews'
 import { seedSaved, type SavedProperty } from './data/saved'
-import { nightsBetween, rangesOverlap } from './dates'
+import { pastStayReservations, pastStayReviews } from './data/pastStays'
+import { seedMessages, seedThreads } from './data/threads'
+import { nightsBetween, rangesOverlap, today } from './dates'
+import type { Message, Thread } from '../types/message'
 
 // nights x nightly price + cleaning fee (no taxes or service fee in this project).
 export function priceBreakdown(property: Property, checkIn: string, checkOut: string): PriceBreakdown {
@@ -45,9 +48,10 @@ export function holdsDates(reservation: Reservation): boolean {
 const properties: Property[] = structuredClone(seedProperties)
 const hosts: Host[] = structuredClone(seedHosts)
 const saved: SavedProperty[] = structuredClone(seedSaved)
-const reviews: Review[] = structuredClone(seedReviews)
+// Recent reviews plus the older San Jose stays' reviews (data/pastStays.ts).
+const reviews: Review[] = structuredClone([...seedReviews, ...pastStayReviews])
 
-const reservations: Reservation[] = seedReservations.map((seed) => {
+const reservations: Reservation[] = [...seedReservations, ...pastStayReservations].map((seed) => {
   const property = properties.find((p) => p.property_id === seed.property_id)!
   return { ...seed, price_breakdown: priceBreakdown(property, seed.check_in, seed.check_out) }
 })
@@ -79,6 +83,18 @@ for (const reservation of reservations.filter(holdsDates)) {
   bookingBlockIds.set(reservation.reservation_id, availabilityId)
 }
 
+// Threads get the display names copied in from the guest, host and listing (C2a).
+const threads: Thread[] = seedThreads.map((t) => {
+  const guest = guests.find((g) => g.guest_id === t.guest_id)!
+  return {
+    ...t,
+    guest_name: `${guest.first_name} ${guest.last_name}`,
+    host_name: hosts.find((h) => h.host_id === t.host_id)!.name,
+    property_title: properties.find((p) => p.property_id === t.property_id)!.title,
+  }
+})
+const messages: Message[] = structuredClone(seedMessages)
+
 export const db = {
   hosts,
   guests,
@@ -87,9 +103,33 @@ export const db = {
   availability,
   saved,
   reviews,
+  threads,
+  messages,
   bookingBlockIds,
   // idempotency_key -> reservation_id: a repeated booking action returns the first result.
   idempotencyKeys: new Map<string, string>(),
+  // idempotency_key -> message_id: a repeated send returns the first message.
+  messageKeys: new Map<string, string>(),
+}
+
+// The Booking Service's daily job (contract booking rule 6, team decisions M1a/M2a):
+//  - approved stays whose check-out day has come become "completed" (so they can be reviewed)
+//  - pending requests whose check-in date has passed expire to "declined" and free their dates
+// The mock runs it before every API call, so a long demo behaves like the real service.
+export function runBookingJob() {
+  const now = today()
+  for (const r of db.reservations) {
+    if (r.status === 'approved' && r.check_out <= now) {
+      r.status = 'completed'
+    } else if (r.status === 'pending' && r.check_in < now) {
+      r.status = 'declined'
+      r.cancellation_reason = 'Expired: the host didn’t respond before check-in.'
+      const blockId = db.bookingBlockIds.get(r.reservation_id)
+      const index = db.availability.findIndex((a) => a.availability_id === blockId)
+      if (index !== -1) db.availability.splice(index, 1)
+      db.bookingBlockIds.delete(r.reservation_id)
+    }
+  }
 }
 
 // True if any blocked or booked dates on the property overlap the requested stay.

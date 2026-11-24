@@ -9,6 +9,7 @@ import { formatDate } from '../dates'
 import { plural } from '../labels'
 import type { Review } from '../types/review'
 import ErrorBanner from './ErrorBanner'
+import { StarIcon } from './icons'
 import { StarRating } from './Stars'
 
 const PAGE_SIZE = 5
@@ -58,7 +59,8 @@ function PropertyReviews({ propertyId, rating, reviewCount }: Props) {
         Reviews
         {reviewCount > 0 && (
           <span className="flex items-center gap-2 font-sans text-base font-normal tracking-normal normal-case text-fg-soft">
-            <StarRating value={Math.round(rating)} /> {rating.toFixed(2)} · {plural(reviewCount, 'review')}
+            {/* One star + the exact average: five whole stars would round 4.6 up to "perfect". */}
+            <StarIcon className="h-4 w-4 text-mustard" /> {rating.toFixed(2)} · {plural(reviewCount, 'review')}
           </span>
         )}
       </h2>

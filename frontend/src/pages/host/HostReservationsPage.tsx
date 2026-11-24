@@ -12,6 +12,7 @@ import { errorMessage } from '../../api/client'
 import { searchProperties } from '../../api/properties'
 import { getGuest } from '../../api/users'
 import ErrorBanner from '../../components/ErrorBanner'
+import MessageButton from '../../components/MessageButton'
 import StatusBadge from '../../components/StatusBadge'
 import { useCurrentUser } from '../../context/useCurrentUser'
 import { formatDate, formatDateTime, localDate } from '../../dates'
@@ -319,11 +320,16 @@ function ReservationRow({ reservation: r, listingTitle, guestName, hostId, onUpd
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-      <p className="text-sm">
+      <div className="flex flex-wrap items-center gap-4 text-sm">
+        <MessageButton
+          label="Message guest"
+          inbox="/host/messages"
+          request={{ guest_id: r.guest_id, host_id: hostId, property_id: r.property_id, reservation_id: r.reservation_id, actor_id: hostId }}
+        />
         <Link to={`/properties/${r.property_id}`} className="text-fg-muted hover:text-fg">
           View listing →
         </Link>
-      </p>
+      </div>
     </li>
   )
 }

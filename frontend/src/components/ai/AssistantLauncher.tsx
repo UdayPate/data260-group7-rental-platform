@@ -42,9 +42,10 @@ function AssistantLauncher() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open])
 
-  // Guest pages only, and not on the AI pages themselves (D1a). Returning null keeps
-  // this component (and its state) alive, so the task is still here when you come back.
-  const hidden = isHostPath(pathname) || pathname.startsWith('/ai')
+  // Guest pages only, and not on the AI pages themselves (D1a), nor on Messages, where it
+  // would sit on top of the message box. Returning null keeps this component (and its
+  // state) alive, so the task is still here when you come back.
+  const hidden = isHostPath(pathname) || pathname.startsWith('/ai') || pathname === '/guest/messages'
   if (hidden) return null
 
   const onSearchPage = pathname === '/'

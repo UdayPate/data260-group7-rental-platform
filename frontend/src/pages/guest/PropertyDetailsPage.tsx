@@ -7,6 +7,7 @@ import { errorMessage } from '../../api/client'
 import { getAvailability, getProperty, saveProperty } from '../../api/properties'
 import { getHost } from '../../api/users'
 import AvailabilityCalendar from '../../components/AvailabilityCalendar'
+import MessageButton from '../../components/MessageButton'
 import PropertyReviews from '../../components/PropertyReviews'
 import BookingPanel from '../../components/BookingPanel'
 import ErrorBanner from '../../components/ErrorBanner'
@@ -212,6 +213,11 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
             <p className="text-sm text-fg-soft sm:ml-auto">
               Replies to {host.response_rate}% of messages, in {formatResponseTime(host.response_time)}
             </p>
+            <MessageButton
+              label="Message host"
+              inbox="/guest/messages"
+              request={{ guest_id: guestId, host_id: host.host_id, property_id: property.property_id, actor_id: guestId }}
+            />
           </div>
 
           <div className="space-y-2">

@@ -8,9 +8,9 @@ frontend changes.
 The frontend lead (Uday) owns the data shapes in this document, so treat them as final.
 To change something, ask him first so the types and mocks change at the same time.
 
-Covered so far: **User**, **Property**, **Booking**, **Review** and **AI Agent** services (all endpoints),
-plus the entity shapes for messages and threads. The request and response bodies for
-Messaging and Analytics will be added when those pages are built.
+Covered so far: **User**, **Property**, **Booking**, **Messaging**, **Review** and **AI Agent** services
+(all endpoints). The request and response bodies for Analytics will be added when the
+dashboards are built.
 
 ---
 
@@ -183,8 +183,11 @@ Any block whose status is not `"available"` makes those nights unavailable.
 | guest_id | string |
 | host_id | string |
 | property_id | string |
-| reservation_id | string\|null |
+| reservation_id | string\|null (the latest reservation the thread was opened from) |
 | created_datetime | datetime |
+| guest_name | string (copied from the guest when the thread opens) |
+| host_name | string (copied from the host) |
+| property_title | string (copied from the listing) |
 
 ### Message (Messaging Service)
 | Field | Type |
@@ -339,6 +342,37 @@ One endpoint, three actions:
 | `POST /bookings/decline` | `{ "reservation_id", "host_id", "reason"?, "idempotency_key" }` | updated Reservation (reason saved in `cancellation_reason`) |
 | `POST /bookings/cancel` | `{ "reservation_id", "guest_id" **or** "host_id", "cancellation_reason", "idempotency_key" }`: send exactly one of guest_id / host_id | updated Reservation |
 
+### Messaging Service (owner: Himja)
+
+| Endpoint | Request body | Response |
+|---|---|---|
+| `POST /threads/open` | `{ "guest_id", "host_id", "property_id", "reservation_id"?, "actor_id" }` | **One thread per guest + host + listing**: returns the existing one (`200`, and updates its `reservation_id` if one is sent) or creates it (`201`). Response is a ThreadSummary for `actor_id`. |
+| `POST /threads/get` | `{ "thread_id", "user_id" }` | ThreadSummary for `user_id` |
+| `POST /threads/byUser` | `{ "user_id" }` (a guest_id or host_id) | `{ "items": ThreadSummary[] }`, most recent activity first |
+| `POST /messages/list` | `{ "thread_id", "user_id" }` | `{ "items": Message[] }`, **oldest first** |
+| `POST /messages/send` | `{ "thread_id", "sender_id", "message_text" (1–2000 characters after trimming), "idempotency_key" }` | `201` Message with `delivery_status: "sent"` and `receiver_id` = the other participant. The same `idempotency_key` again returns the first message (`200`). |
+
+**ThreadSummary** = Thread plus:
+
+| Field | Type | Notes |
+|---|---|---|
+| last_message | `{ text, timestamp, sender_id }` \| null | the newest message in the thread |
+| unread_count | number | messages **to the asking user** whose `delivery_status` isn't `"read"` |
+
+**Messaging rules (team decisions):**
+1. **Participants only:** `threads/get`, `messages/list` and `messages/send` return `403 UNAUTHORIZED` unless
+   `user_id` / `sender_id` is the thread's guest or host.
+2. **Opening a thread:** `actor_id` must be the guest or the host (`403`); `host_id` must host `property_id` (`400`);
+   a `reservation_id`, if sent, must belong to that guest and listing (`400`). **A host may only open a thread with a
+   guest who has a reservation (any status) at that listing** (`403`, so no cold messages). Guests may message any host.
+3. **Delivery status** (decided by the server, no extra endpoint):
+   - `sent`: the message was stored.
+   - `delivered`: it appeared in the receiver's `threads/byUser` response.
+   - `read`: the receiver called `messages/list` for that thread.
+4. **Live updates:** none yet (no WebSocket). The UI checks an open conversation every 5 s, the thread list every 15 s
+   and the unread badge every 30 s.
+5. Kafka: publish `message.sent` (spec 6.1) with the message as payload and `idempotency_key` = `message_id`.
+
 ### Review Service (owner: Himja)
 
 | Endpoint | Request body | Response |
@@ -392,6 +426,13 @@ One endpoint, three actions:
    If the same key arrives again, return the result of the first call with `200` and change nothing.
 6. **Status transitions:** `pending → approved | declined | cancelled`, `approved → cancelled | completed`.
    `completed` is set after check-out (by a backend job; the frontend never sets it).
+   **The Booking Service must run this job:** e.g. once a day, every `approved` reservation whose
+   `check_out` is today or earlier becomes `completed` (with a `booking.completed` Kafka event).
+   Reviews require a `completed` stay (Review rule 1), so without this job no new stay can ever be
+   reviewed.
+   The same job **expires stale requests**: every `pending` reservation whose `check_in` date has
+   passed becomes `declined` with `cancellation_reason` "Expired: the host didn’t respond before
+   check-in." and its dates are released (team decision M2a). The mock runs this job before every API call.
 7. **Double booking (spec §13.1):** the "no overlap" check in rule 2 must be enforced by the
    database or a transaction, not only by a read-then-write in code, so two simultaneous
    requests can't both succeed. The mocks don't do this for you.
@@ -578,7 +619,9 @@ compare responses:
 - 8 hosts (`h_001`–`h_008`), 12 guests (`g_001`–`g_012`)
 - 30 properties (`p_001`–`p_030`) in San Jose, Sunnyvale and Mountain View; `p_012` is inactive
 - 24 reservations in every status, and 5 host-blocked date ranges
-- 6 reviews (`v_001`–`v_006`) on completed stays; `v_003` and `v_006` have no host reply yet, and Alex's completed stay `r_012` has no review
+- 6 recent reviews (`v_001`–`v_006`) on completed stays; `v_003` and `v_006` have no host reply yet, and Alex's completed stay `r_012` has no review
+- 40 older completed stays (`r_025`–`r_064`) with reviews (`v_007`–`v_046`), 3–4 per San Jose listing
+- 5 conversations (`t_001`–`t_005`, 12 messages) in mixed delivery states
 
 Seed dates are relative to today, so they're always in the right past or future.
 The spec's demo search ("San Jose, 2 guests, ≤ $250, parking + kitchen, rating ≥ 4.5")

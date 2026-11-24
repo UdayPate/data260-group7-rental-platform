@@ -7,6 +7,7 @@ import BrandLogo from './BrandLogo'
 import FilterStrip from './FilterStrip'
 import HostFilterStrip from './HostFilterStrip'
 import SearchBar from './SearchBar'
+import UnreadBadge from './UnreadBadge'
 import UserPicker from './UserPicker'
 
 type NavItem = { to: string; label: string }
@@ -33,12 +34,13 @@ const hostNav: NavItem[] = [
 function Header() {
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
-  const { usersVersion } = useCurrentUser()
+  const { usersVersion, guestId, hostId } = useCurrentUser()
 
   // The mode comes from the URL (see mode.ts). No separate state, so the toggle
   // and the page can never disagree.
   const isHost = isHostPath(pathname)
   const navItems = isHost ? hostNav : guestNav
+  const userId = isHost ? hostId : guestId // whose unread messages the badge counts
   const onSearchPage = pathname === '/'
 
   return (
@@ -63,6 +65,7 @@ function Header() {
               }
             >
               {item.label}
+              {item.to.endsWith('/messages') && <UnreadBadge key={userId} userId={userId} />}
             </NavLink>
           ))}
         </nav>

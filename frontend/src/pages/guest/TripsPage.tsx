@@ -17,16 +17,18 @@ import type { Property } from '../../types/property'
 import type { Reservation } from '../../types/reservation'
 import type { Review } from '../../types/review'
 
-type Tab = 'upcoming' | 'past' | 'cancelled'
+type TripTab = 'upcoming' | 'past' | 'cancelled'
+type Tab = TripTab | 'reviews' // the last tab lists the guest's reviews (U2a)
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'upcoming', label: 'Upcoming' },
   { id: 'past', label: 'Past' },
   { id: 'cancelled', label: 'Cancelled' },
+  { id: 'reviews', label: 'My reviews' },
 ]
 
 // Which tab a reservation belongs in.
-function tabOf(r: Reservation): Tab {
+function tabOf(r: Reservation): TripTab {
   if (r.status === 'cancelled' || r.status === 'declined') return 'cancelled'
   if ((r.status === 'pending' || r.status === 'approved') && r.check_out > localDate()) return 'upcoming'
   return 'past' // completed, or approved and already over
@@ -42,7 +44,7 @@ function Trips({ guestId }: { guestId: string }) {
   const notice = (location.state as { notice?: string } | null)?.notice
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const tab: Tab = tabParam === 'past' || tabParam === 'cancelled' ? tabParam : 'upcoming'
+  const tab: Tab = tabParam === 'past' || tabParam === 'cancelled' || tabParam === 'reviews' ? tabParam : 'upcoming'
 
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [listings, setListings] = useState<Record<string, Property | null>>({}) // null = listing no longer exists
@@ -84,7 +86,7 @@ function Trips({ guestId }: { guestId: string }) {
   const shown = reservations
     .filter((r) => tabOf(r) === tab)
     .sort((a, b) => (tab === 'upcoming' ? a.check_in.localeCompare(b.check_in) : b.check_in.localeCompare(a.check_in)))
-  const count = (t: Tab) => reservations.filter((r) => tabOf(r) === t).length
+  const count = (t: Tab) => (t === 'reviews' ? reviews.length : reservations.filter((r) => tabOf(r) === t).length)
   const titleOf = (propertyId: string) => listings[propertyId]?.title ?? 'Listing no longer available'
 
   return (
@@ -146,7 +148,11 @@ function Trips({ guestId }: { guestId: string }) {
             ))}
           </div>
 
-          {shown.length === 0 && (
+          {tab === 'reviews' && (
+            <MyReviews reviews={reviews} reservations={reservations} titleOf={titleOf} />
+          )}
+
+          {tab !== 'reviews' && shown.length === 0 && (
             <div className="rounded-2xl border border-line bg-surface p-8 text-center text-fg-soft">
               {tab === 'upcoming' ? (
                 <>
@@ -204,6 +210,54 @@ function Trips({ guestId }: { guestId: string }) {
         </>
       )}
     </section>
+  )
+}
+
+// ---------- "My reviews" tab: every review the guest wrote, in full (U2a) ----------
+
+type MyReviewsProps = {
+  reviews: Review[] // from /reviews/byGuest, newest first
+  reservations: Reservation[]
+  titleOf: (propertyId: string) => string
+}
+
+function MyReviews({ reviews, reservations, titleOf }: MyReviewsProps) {
+  if (reviews.length === 0) {
+    return (
+      <div className="rounded-2xl border border-line bg-surface p-8 text-center text-fg-soft">
+        You haven’t written any reviews yet. Completed stays show up under “To review”.
+      </div>
+    )
+  }
+  return (
+    <ul className="space-y-3">
+      {reviews.map((v) => {
+        const stay = reservations.find((r) => r.reservation_id === v.reservation_id)
+        return (
+          <li key={v.review_id} data-my-review={v.review_id} className="space-y-2 rounded-2xl border border-line bg-surface p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link to={`/properties/${v.property_id}`} className="font-condensed text-xl font-bold hover:underline">
+                {titleOf(v.property_id)}
+              </Link>
+              <StarRating value={v.rating} />
+            </div>
+            <p className="text-sm text-fg-muted">
+              {stay ? `Stayed ${formatDate(stay.check_in)} → ${formatDate(stay.check_out)} · ` : ''}
+              Posted {formatDate(v.created_datetime.slice(0, 10))}
+            </p>
+            <p className="text-fg-soft">{v.review_text}</p>
+            {v.response_text ? (
+              <div className="rounded-xl border-l-4 border-mustard bg-surface-2 p-3 text-sm">
+                <p className="font-semibold text-mustard">Host’s reply</p>
+                <p className="text-fg-soft">{v.response_text}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-fg-muted">No reply from the host yet.</p>
+            )}
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 

@@ -6,6 +6,7 @@ import { cancelBooking, getBooking, newIdempotencyKey } from '../../api/bookings
 import { errorMessage } from '../../api/client'
 import { getProperty } from '../../api/properties'
 import ErrorBanner from '../../components/ErrorBanner'
+import MessageButton from '../../components/MessageButton'
 import StatusBadge from '../../components/StatusBadge'
 import { useCurrentUser } from '../../context/useCurrentUser'
 import { formatDate, formatDateTime, localDate } from '../../dates'
@@ -227,6 +228,18 @@ function ReservationStatus({ reservationId, guestId }: Props) {
         >
           Refresh status
         </button>
+        <MessageButton
+          label="Message host"
+          inbox="/guest/messages"
+          className="px-5 py-2 text-base"
+          request={{
+            guest_id: guestId,
+            host_id: property.host_id,
+            property_id: property.property_id,
+            reservation_id: reservation.reservation_id,
+            actor_id: guestId,
+          }}
+        />
         {canCancel && !confirmingCancel && (
           <button
             type="button"
