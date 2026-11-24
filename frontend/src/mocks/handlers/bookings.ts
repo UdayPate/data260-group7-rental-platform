@@ -5,7 +5,9 @@
 //  - the guest cancels pending/approved before check-in; the host cancels approved before check-in, with a reason
 //  - the same idempotency_key twice returns the first result instead of acting twice
 import { delay, http, HttpResponse } from 'msw'
+import type { AvailabilityChangeReason } from '../../types/availability'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
+import { publishAvailability } from '../availability/bus'
 import { isValidDate, nowDatetime, rangesOverlap, today } from '../dates'
 import { db, hasDateConflict, holdsDates, nextId, priceBreakdown } from '../db'
 import { errorResponse, invalidJsonResponse, MOCK_DELAY_MS, readBody, requireFields } from '../responses'
@@ -18,11 +20,15 @@ function alreadyDone(key: unknown): Reservation | undefined {
   return db.reservations.find((r) => r.reservation_id === reservationId)
 }
 
-// Frees the reservation's dates by removing its "booked" availability block.
-function releaseDates(reservation: Reservation) {
+// Frees the reservation's dates by removing its "booked" availability block,
+// and tells everyone viewing the property (spec 13.4).
+function releaseDates(reservation: Reservation, reason: AvailabilityChangeReason) {
   const blockId = db.bookingBlockIds.get(reservation.reservation_id)
   const index = db.availability.findIndex((a) => a.availability_id === blockId)
-  if (index !== -1) db.availability.splice(index, 1)
+  if (index !== -1) {
+    const [block] = db.availability.splice(index, 1)
+    publishAvailability('availability.released', block, reason, reservation.trace_id)
+  }
   db.bookingBlockIds.delete(reservation.reservation_id)
 }
 
@@ -98,17 +104,19 @@ export const bookingHandlers = [
     db.reservations.push(reservation)
 
     // Hold the dates (pending requests block them too).
-    const availabilityId = nextId('a', db.availability.map((a) => a.availability_id))
-    db.availability.push({
-      availability_id: availabilityId,
+    const block = {
+      availability_id: nextId('a', db.availability.map((a) => a.availability_id)),
       property_id: property.property_id,
       start_date: check_in,
       end_date: check_out,
-      status: 'booked',
-      source: 'booking',
+      status: 'booked' as const,
+      source: 'booking' as const,
       updated_datetime: reservation.booking_datetime,
-    })
-    db.bookingBlockIds.set(reservation.reservation_id, availabilityId)
+    }
+    db.availability.push(block)
+    db.bookingBlockIds.set(reservation.reservation_id, block.availability_id)
+    // Live update for everyone viewing this property (spec 13.4), in this booking's journey.
+    publishAvailability('availability.blocked', block, 'booking_requested', reservation.trace_id)
     db.idempotencyKeys.set(String(body.idempotency_key), reservation.reservation_id)
     guest.booking_count += 1
 
@@ -204,7 +212,7 @@ export const bookingHandlers = [
 
     reservation.status = 'declined'
     reservation.cancellation_reason = typeof body.reason === 'string' && body.reason !== '' ? body.reason : null
-    releaseDates(reservation)
+    releaseDates(reservation, 'booking_declined')
     db.idempotencyKeys.set(String(body.idempotency_key), reservation.reservation_id)
     return HttpResponse.json(reservation)
   }),
@@ -250,7 +258,7 @@ export const bookingHandlers = [
 
     reservation.status = 'cancelled'
     reservation.cancellation_reason = reason === '' ? null : reason
-    releaseDates(reservation)
+    releaseDates(reservation, 'booking_cancelled')
     db.idempotencyKeys.set(String(body.idempotency_key), reservation.reservation_id)
     return HttpResponse.json(reservation)
   }),

@@ -330,6 +330,49 @@ One endpoint, three actions:
    `409 INVALID_STATUS`; free those nights by declining or cancelling the reservation.
 5. A guest's booking request that overlaps a host block gets `409 DATE_CONFLICT` (booking rule 2).
 
+#### WebSocket `/properties/{property_id}/availability/stream` (live availability, spec §13.4)
+
+While a guest has a property page open, it keeps this socket open (`ws://` or `wss://` on the
+Property Service's base URL). Whenever a block on that property is **added or removed**, the
+service sends one JSON message to every socket open for that property. This is how a guest sees
+"dates no longer available" without a refresh (team decisions R1a, R2a).
+
+- **Nothing is sent on connect.** The page reads the calendar with `POST /properties/availability`
+  every time the socket opens, including after a reconnect (R7a), so the server needs no replay.
+- **Unknown property:** close the socket with code `4404`. The page does not retry codes ≥ 4000.
+  Any other close is retried by the page (1 s, 2 s, 4 s, then every 8 s).
+- **Message = the shared envelope (spec 6.2):**
+
+| Field | Value |
+|---|---|
+| event_type | `"availability.blocked"` (a block was added) or `"availability.released"` (a block was removed) |
+| trace_id | the **reservation's `trace_id`** when a booking caused it; a new UUID for a host block / unblock |
+| timestamp | UTC ISO time **when the block was written**; the page measures notification latency from here |
+| actor_id | the service that made the change: `"booking-service"` or `"property-service"`. **Never a guest id**: every viewer of the property receives this message |
+| entity | `{ "entity_type": "property", "entity_id": "<property_id>" }` |
+| payload | `{ "block": AvailabilityBlock, "reason": "booking_requested" \| "booking_declined" \| "booking_cancelled" \| "host_blocked" \| "host_unblocked" }`. For `released`, `block` is the block as it was before removal |
+| idempotency_key | `"<trace_id>:<availability_id>:<event_type>"`: unique per change. The page ignores a repeat |
+
+When to send (Kafka → Property Service → sockets):
+
+| Change | event_type | reason |
+|---|---|---|
+| Booking request created (pending requests hold dates, booking rule 1) | `availability.blocked` | `booking_requested` |
+| Request declined, or expired by the daily job before check-in* | `availability.released` | `booking_declined` |
+| Reservation cancelled (by guest or host) | `availability.released` | `booking_cancelled` |
+| Host blocks / unblocks dates | `availability.blocked` / `availability.released` | `host_blocked` / `host_unblocked` |
+
+\* An expiry only frees nights whose check-in has already passed, so the mock doesn't send it; the real service may.
+
+**What the page does with it:** it adds or removes the block in the calendar. If the guest's picked nights now
+overlap a block, the "Request to book" button is disabled with a notice (R4a, R5a). The `409 DATE_CONFLICT` on
+`/bookings/request` stays as the backstop for anything the socket missed.
+
+**Latency (spec §13.4):** for every message the page logs the server `timestamp`, the time the message
+arrived, and the time the calendar showed it. It then sends `availability.notified` to `/events/ingest`
+(see Analytics) with `latency_ms`, in the same `trace_id`. This number is only accurate if the service
+machines and the demo laptop keep their clocks in sync (NTP), because it compares two clocks (R9a).
+
 ### Booking Service
 
 | Endpoint | Request body | Response |
@@ -414,8 +457,10 @@ The dashboards read everything from these endpoints. `GET` endpoints take query 
 | `GET /analytics/funnel` | `days`, `host_id`? | `{ host_id, days, funnel }`, the views → saves → requests → approved funnel (all hosts if no `host_id`) |
 | `GET /analytics/geo` | none | `{ "items": [{ city, listings, bookings }] }` |
 
-**Events the UI sends (C4a):** `property.viewed` (property page; `entity` = the property) and `search.performed`
-(search results; `payload.results` = number of results). They are fire-and-forget: the UI never shows an analytics
+**Events the UI sends (C4a):** `property.viewed` (property page; `entity` = the property), `search.performed`
+(search results; `payload.results` = number of results) and `availability.notified` (one per live calendar update
+on a property page, spec §13.4; `trace_id` = the update's own trace, `payload` = `{ event_type, availability_id,
+latency_ms, delivery_ms, render_ms }` where `latency_ms` = time from the service's timestamp to the page showing it). They are fire-and-forget: the UI never shows an analytics
 error to a guest, it only logs it in the browser console. The ingest endpoint must validate the envelope:
 all of `event_type`, `trace_id`, `timestamp` (ISO), `actor_id`, `entity { entity_type, entity_id }`, `payload`
 (object) and `idempotency_key`; an unknown `event_type` is also rejected.
@@ -437,7 +482,8 @@ score of the stays the AI recommended to this guest), `recommendation_approvals 
 **PlatformDashboard:** `events_by_topic [{ topic, count }]` (with `trace_id`: that journey's events only),
 `consumer_groups` (up to 4 names), `consumer_lag [{ time, <group>: lag, … }]`, `throughput [{ time, events_per_sec }]`
 (one point per day; every 3 days for 90 days), `errors_retries [{ service, errors, retries }]`,
-`dead_letters [{ topic, reason, trace_id, timestamp }]`, `rejected_envelopes`, `workflow_latency [{ workflow, avg_ms, p95_ms }]`.
+`dead_letters [{ topic, reason, trace_id, timestamp }]`, `rejected_envelopes`, `workflow_latency [{ workflow, avg_ms, p95_ms }]`. The workflow
+`"Dates taken → other viewers’ pages"` is the average and p95 of `availability.notified` `latency_ms`.
 
 **AiDashboard:** `debates`, `timeline { trace_id, task_id, request_text, points [{ agent, event_type, offset_ms, round }] }`
 (the chosen or latest debate), `disagreement_histogram [{ bucket: "0"|"0.33"|"0.67", debates }]`, `average_challenges`,
@@ -463,7 +509,8 @@ Kafka, the consumer's MySQL write (including retries), the availability push, th
 
 1. **Pending and approved reservations hold their dates.** When a request is created, the
    service adds a `booked` / `booking` availability block for its dates. Declining or
-   cancelling removes that block. Approving keeps it.
+   cancelling removes that block. Approving keeps it. **Every add or remove is pushed live to
+   everyone viewing the property** (WebSocket `/properties/{property_id}/availability/stream`, spec §13.4).
 2. **Request validation, in order:**
    - All required fields → `400`
    - Repeated `idempotency_key` → return the original reservation, `200`

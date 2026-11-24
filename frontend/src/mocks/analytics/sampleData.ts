@@ -89,5 +89,6 @@ export const sampleWorkflowLatency = [
   { workflow: 'Property search', avg_ms: 95, p95_ms: 240 },
   { workflow: 'Booking request → stored', avg_ms: 140, p95_ms: 390 },
   { workflow: 'Booking request → host notified', avg_ms: 820, p95_ms: 2100 },
+  { workflow: 'Dates taken → other viewers’ pages', avg_ms: 60, p95_ms: 180 },
   { workflow: 'AI request → verdict', avg_ms: 23400, p95_ms: 26900 },
 ]

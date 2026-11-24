@@ -218,6 +218,7 @@ function eventsByTopic(days: number) {
     'property.saved': db.saved.filter((s) => withinDays(s.saved_datetime ?? '', days)).length,
     'property.viewed': db.uiEvents.filter((e) => e.event_type === 'property.viewed' && withinDays(e.timestamp, days)).length,
     'search.performed': db.uiEvents.filter((e) => e.event_type === 'search.performed' && withinDays(e.timestamp, days)).length,
+    'availability.notified': db.uiEvents.filter((e) => e.event_type === 'availability.notified' && withinDays(e.timestamp, days)).length,
     'ai.requests': allTaskEntries().length,
     'debate.round.0': 0,
     'debate.round.1': 0,
@@ -262,11 +263,24 @@ export function platformDashboard(days: number, traceId: string | null): Platfor
 
   const session = sessionDebates().filter((d) => d.verdict_ms !== null)
   const aiAvg = average(session.map((d) => d.verdict_ms!))
-  const workflow_latency = sampleWorkflowLatency.map((w) =>
-    w.workflow === 'AI request → verdict' && aiAvg !== null
-      ? { workflow: w.workflow, avg_ms: Math.round(aiAvg), p95_ms: Math.round(Math.max(...session.map((d) => d.verdict_ms!))) }
-      : w,
-  )
+  // Live calendar updates measured by guests' pages (spec 13.4, team decision R6a).
+  const pushLatencies = db.uiEvents
+    .filter((e) => e.event_type === 'availability.notified' && typeof e.payload.latency_ms === 'number')
+    .map((e) => e.payload.latency_ms as number)
+  const pushAvg = average(pushLatencies)
+  const sorted = [...pushLatencies].sort((a, b) => a - b)
+  const pushP95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]
+
+  const workflow_latency = sampleWorkflowLatency.map((w) => {
+    if (w.workflow === 'AI request → verdict' && aiAvg !== null) {
+      return { workflow: w.workflow, avg_ms: Math.round(aiAvg), p95_ms: Math.round(Math.max(...session.map((d) => d.verdict_ms!))) }
+    }
+    if (w.workflow === 'Dates taken → other viewers’ pages' && pushAvg !== null) {
+      return { workflow: w.workflow, avg_ms: Math.round(pushAvg), p95_ms: pushP95 }
+    }
+    return w
+  })
+  const measured = [aiAvg !== null && '“AI request → verdict”', pushAvg !== null && '“Dates taken → other viewers’ pages”'].filter(Boolean)
 
   const scale = days / 30
   return {
@@ -290,7 +304,10 @@ export function platformDashboard(days: number, traceId: string | null): Platfor
       kafka: sample('Kafka consumer lag and throughput'),
       errors: sample('Service error and retry counters'),
       dead_letters: sample(`${db.rejectedEnvelopes.length} real rejected envelope(s) from /events/ingest, plus sample dead letters`),
-      latency: aiAvg !== null ? sample('Sample, except “AI request → verdict”, measured from this session’s debates') : sample('Workflow timings'),
+      latency:
+        measured.length > 0
+          ? sample(`Sample, except ${measured.join(' and ')}, measured in this session`)
+          : sample('Workflow timings'),
     },
   }
 }

@@ -1,6 +1,8 @@
 // Holds the demo guest and demo host we're acting as (there's no real login).
-// Both are saved in localStorage (the browser's built-in storage), so a reload keeps them.
+// Both are kept per browser tab (see tabStorage.ts), so two tabs can act as two different
+// guests and a reload keeps each tab's choice.
 import { useState, type ReactNode } from 'react'
+import { readTabValue, writeTabValue } from '../tabStorage'
 import { CurrentUserContext } from './useCurrentUser'
 
 const GUEST_KEY = 'cedar-rye.guestId'
@@ -12,16 +14,16 @@ const DEFAULT_HOST_ID = 'h_001'
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
   // The function form of useState runs once, on the first render only.
-  const [guestId, setGuestIdState] = useState(() => localStorage.getItem(GUEST_KEY) ?? DEFAULT_GUEST_ID)
-  const [hostId, setHostIdState] = useState(() => localStorage.getItem(HOST_KEY) ?? DEFAULT_HOST_ID)
+  const [guestId, setGuestIdState] = useState(() => readTabValue(GUEST_KEY) ?? DEFAULT_GUEST_ID)
+  const [hostId, setHostIdState] = useState(() => readTabValue(HOST_KEY) ?? DEFAULT_HOST_ID)
 
   function setGuestId(id: string) {
-    localStorage.setItem(GUEST_KEY, id)
+    writeTabValue(GUEST_KEY, id)
     setGuestIdState(id)
   }
 
   function setHostId(id: string) {
-    localStorage.setItem(HOST_KEY, id)
+    writeTabValue(HOST_KEY, id)
     setHostIdState(id)
   }
 

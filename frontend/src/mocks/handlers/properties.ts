@@ -2,6 +2,7 @@
 import { delay, http, HttpResponse } from 'msw'
 import { AMENITIES, PROPERTY_TYPES, type Amenity, type Property, type PropertyType } from '../../types/property'
 import { isValidDate, nowDatetime, rangesOverlap, today } from '../dates'
+import { publishAvailability } from '../availability/bus'
 import { db, hasDateConflict, holdsDates, nextId } from '../db'
 import { checkPaging, errorResponse, invalidJsonResponse, MOCK_DELAY_MS, paginate, readBody, requireFields } from '../responses'
 
@@ -291,6 +292,7 @@ export const propertyHandlers = [
         )
       }
       db.availability.splice(index, 1)
+      publishAvailability('availability.released', block, 'host_unblocked', crypto.randomUUID()) // spec 13.4
       return HttpResponse.json({ availability_id: block.availability_id, unblocked: true })
     }
 
@@ -342,6 +344,7 @@ export const propertyHandlers = [
       updated_datetime: nowDatetime(),
     }
     db.availability.push(block)
+    publishAvailability('availability.blocked', block, 'host_blocked', crypto.randomUUID()) // spec 13.4
     return HttpResponse.json(block, { status: 201 })
   }),
 ]

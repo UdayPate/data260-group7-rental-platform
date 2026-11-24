@@ -4,6 +4,7 @@ import { runBookingJob } from '../db'
 import { errorResponse } from '../responses'
 import { aiHandlers } from './ai'
 import { analyticsHandlers } from './analytics'
+import { availabilityStreamHandler } from './availability'
 import { bookingHandlers } from './bookings'
 import { messagingHandlers } from './messaging'
 import { propertyHandlers } from './properties'
@@ -23,6 +24,7 @@ export const handlers = [
 
   ...userHandlers,
   ...propertyHandlers,
+  availabilityStreamHandler,
   ...bookingHandlers,
   ...aiHandlers,
   ...reviewHandlers,

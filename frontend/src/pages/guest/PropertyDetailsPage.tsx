@@ -1,21 +1,26 @@
 // Property details (guest): photo, title, rating, save heart, host, description,
 // amenities, availability calendar, and the booking panel on the right.
 // Dates and guests can arrive in the URL from the search page (team decision D5a).
+// The calendar stays live over a WebSocket (spec 13.4): nights another guest takes turn
+// unavailable without a refresh, and the booking panel stops a stale request.
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { trackEvent } from '../../api/analytics'
 import { errorMessage } from '../../api/client'
 import { getAvailability, getProperty, saveProperty } from '../../api/properties'
 import { getHost } from '../../api/users'
+import { applyAvailabilityEvent } from '../../availability'
 import AvailabilityCalendar from '../../components/AvailabilityCalendar'
 import MessageButton from '../../components/MessageButton'
 import PropertyReviews from '../../components/PropertyReviews'
 import BookingPanel from '../../components/BookingPanel'
 import ErrorBanner from '../../components/ErrorBanner'
+import { LiveStatusPill, LiveUpdatesLog } from '../../components/LiveUpdates'
 import { HeartIcon, HouseIcon, StarIcon } from '../../components/icons'
 import { useCurrentUser } from '../../context/useCurrentUser'
 import { dateString, localDate } from '../../dates'
 import { AMENITY_LABELS, PROPERTY_TYPE_LABELS, plural } from '../../labels'
+import { useAvailabilityStream } from '../../realtime/useAvailabilityStream'
 import type { AvailabilityBlock } from '../../types/availability'
 import type { Host } from '../../types/host'
 import type { PropertyWithSaved } from '../../types/property'
@@ -58,6 +63,8 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0) // bumped by Retry
 
+  const [calendarError, setCalendarError] = useState<string | null>(null)
+
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -96,6 +103,27 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
       ignore = true
     }
   }, [propertyId, guestId, attempt])
+
+  // Re-read the calendar. Runs every time the live socket opens (team decision R7a), so a
+  // change made while we weren't connected is not missed.
+  function refreshCalendar() {
+    const range = calendarRange()
+    getAvailability({ property_id: propertyId, start_date: range.start, end_date: range.end })
+      .then((availability) => {
+        setBlocks(availability.items)
+        setCalendarError(null)
+      })
+      .catch((err: unknown) => setCalendarError(`Couldn’t refresh the calendar: ${errorMessage(err)}`))
+  }
+
+  // Live updates (spec 13.4), once the page has loaded.
+  const live = useAvailabilityStream({
+    propertyId,
+    viewerId: guestId,
+    enabled: property !== null,
+    onEvent: (event) => setBlocks((current) => applyAvailabilityEvent(current, event)),
+    onOpen: refreshCalendar,
+  })
 
   function retry() {
     setError(null)
@@ -150,6 +178,20 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
   }
 
   const typeLabel = PROPERTY_TYPE_LABELS[property.property_type]
+
+  // The newest live update that took any of the picked nights (and is still in the calendar).
+  const liveClash =
+    checkIn && checkOut
+      ? live.updates.find((u) => {
+          const b = u.event.payload.block
+          return (
+            u.event.event_type === 'availability.blocked' &&
+            blocks.some((x) => x.availability_id === b.availability_id) &&
+            b.start_date < checkOut &&
+            checkIn < b.end_date
+          )
+        })
+      : undefined
 
   return (
     <section className="space-y-6">
@@ -240,9 +282,19 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
           </div>
 
           <div className="space-y-3">
-            <h2 className="font-condensed text-xl font-bold tracking-[0.06em] uppercase">Availability</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="font-condensed text-xl font-bold tracking-[0.06em] uppercase">Availability</h2>
+              <LiveStatusPill status={live.status} />
+            </div>
             <AvailabilityCalendar blocks={blocks} checkIn={checkIn} checkOut={checkOut} />
-            <p className="text-xs text-fg-muted">Calendar as of when this page loaded (today is {localDate()}).</p>
+            <p className="text-xs text-fg-muted">
+              {live.status === 'live'
+                ? 'Updates live: nights other guests take turn unavailable without a refresh.'
+                : 'Not connected for live updates: the calendar may be out of date until it reconnects.'}{' '}
+              Today is {localDate()}.
+            </p>
+            {calendarError && <ErrorBanner message={calendarError} onRetry={refreshCalendar} />}
+            <LiveUpdatesLog updates={live.updates} />
           </div>
 
           <PropertyReviews propertyId={property.property_id} rating={property.rating} reviewCount={property.review_count} />
@@ -260,6 +312,7 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
             onCheckInChange={setCheckIn}
             onCheckOutChange={setCheckOut}
             onGuestsChange={setGuests}
+            liveClash={liveClash}
           />
         </div>
       </div>

@@ -35,7 +35,7 @@ function bookingSteps(r: Reservation): TraceStep[] {
     add('booking-worker', 'booking.requested consumed', 2000, 'retried', 'MySQL deadlock on availability row; retrying after 2 s backoff')
   }
   add('booking-worker', 'booking.requested consumed → MySQL write', 35 + (jitter % 30))
-  add('notification-service', 'availability.updated (WebSocket push)', 8 + (jitter % 9))
+  add('property-service', 'availability.blocked (WebSocket push to viewers)', 8 + (jitter % 9))
 
   // Later steps happen hours or days after the request (the host's decision, check-out, a review).
   if (r.status === 'approved' || r.status === 'completed') {
@@ -48,6 +48,7 @@ function bookingSteps(r: Reservation): TraceStep[] {
     add('booking-service', `POST /bookings/${r.status === 'declined' ? 'decline' : 'cancel'}`, 28, 'ok', null, (3 + (jitter % 20)) * HOUR)
     add('kafka', type, 5)
     add('booking-worker', `${type} consumed → dates released`, 33)
+    add('property-service', 'availability.released (WebSocket push to viewers)', 9)
   }
   if (r.status === 'completed') {
     time = `${r.check_out}T10:00:00.000Z`

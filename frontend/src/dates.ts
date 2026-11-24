@@ -28,3 +28,9 @@ export function formatDate(date: string): string {
 export function formatDateTime(datetime: string): string {
   return new Date(datetime).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
+
+// "14:03:22.481" in the viewer's time zone
+export function clockTime(ms: number): string {
+  const d = new Date(ms)
+  return `${d.toLocaleTimeString('en-US', { hour12: false })}.${String(d.getMilliseconds()).padStart(3, '0')}`
+}

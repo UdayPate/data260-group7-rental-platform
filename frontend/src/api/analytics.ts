@@ -49,10 +49,17 @@ export const ingestEvent = (envelope: EventEnvelope) => post<IngestResponse>(bas
 
 // Fire-and-forget UI event in the shared envelope (team decision C4a).
 // A failure is only logged to the console: a guest shouldn't see analytics errors.
-export function trackEvent(eventType: UiEventType, actorId: string, entity: EventEnvelope['entity'], payload: Record<string, unknown> = {}) {
+// traceId: pass one to join an existing journey (e.g. a booking's); otherwise the event starts its own.
+export function trackEvent(
+  eventType: UiEventType,
+  actorId: string,
+  entity: EventEnvelope['entity'],
+  payload: Record<string, unknown> = {},
+  traceId: string = crypto.randomUUID(),
+) {
   const envelope: EventEnvelope = {
     event_type: eventType,
-    trace_id: crypto.randomUUID(), // a UI event starts its own small journey
+    trace_id: traceId,
     timestamp: new Date().toISOString(),
     actor_id: actorId,
     entity,

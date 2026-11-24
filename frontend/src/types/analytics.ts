@@ -8,7 +8,8 @@ export type Source = { kind: 'computed' | 'sample'; note: string }
 
 // ---------- Events sent by the UI (C4a) ----------
 // Same envelope as every Kafka message (spec 6.2).
-export const UI_EVENT_TYPES = ['property.viewed', 'search.performed'] as const
+// availability.notified (team decision R6a): one per live calendar update, with the measured latency.
+export const UI_EVENT_TYPES = ['property.viewed', 'search.performed', 'availability.notified'] as const
 export type UiEventType = (typeof UI_EVENT_TYPES)[number]
 
 export type EventEnvelope = {

@@ -6,8 +6,9 @@ import { Link, useNavigate } from 'react-router'
 import { newIdempotencyKey, requestBooking } from '../api/bookings'
 import { ApiError, errorMessage } from '../api/client'
 import { stayHasUnavailableNight } from '../availability'
-import { localDate, nightsBetween } from '../dates'
-import { formatPrice, plural } from '../labels'
+import { clockTime, localDate, nightsBetween } from '../dates'
+import { AVAILABILITY_REASON_TEXT, formatPrice, plural } from '../labels'
+import { notificationLatencyMs, type LiveUpdate } from '../realtime/useAvailabilityStream'
 import type { AvailabilityBlock } from '../types/availability'
 import type { Property } from '../types/property'
 import ErrorBanner from './ErrorBanner'
@@ -22,6 +23,8 @@ type Props = {
   onCheckInChange: (value: string) => void
   onCheckOutChange: (value: string) => void
   onGuestsChange: (value: number) => void
+  // The live update (spec 13.4) that just took some of the picked nights, if any.
+  liveClash: LiveUpdate | undefined
 }
 
 // What went wrong with the last request, kept with its code so we can add a link
@@ -45,8 +48,16 @@ function BookingPanel(props: Props) {
   const datesPicked = checkIn !== '' && checkOut !== ''
   const nights = datesPicked ? nightsBetween(checkIn, checkOut) : 0
   const subtotal = nights * property.nightly_price
+  // Any picked night that is taken blocks the request (team decision R4a). The server's
+  // 409 DATE_CONFLICT stays as the backstop if a request still gets through.
   const looksUnavailable = datesPicked && stayHasUnavailableNight(blocks, checkIn, checkOut)
   const inactive = property.status !== 'active'
+
+  // Keep nothing of the old dates: the guest picks again (R5a).
+  function chooseNewDates() {
+    props.onCheckInChange('')
+    props.onCheckOutChange('')
+  }
 
   function changeCheckIn(value: string) {
     props.onCheckInChange(value)
@@ -137,12 +148,25 @@ function BookingPanel(props: Props) {
         />
       </label>
 
-      {/* Warn, but still let the server decide (team decision D4a). */}
-      {looksUnavailable && (
-        <p className="rounded-xl border border-status-pending p-3 text-sm text-status-pending" role="status">
-          Some of these nights are already taken (struck through in the calendar). The host’s calendar has the final say
-          when you send the request.
-        </p>
+      {/* Hidden while sending: our own request's update arrives here too, just before we move on. */}
+      {looksUnavailable && !submitting && (
+        <div data-date-clash className="space-y-2 rounded-xl border border-status-error-border p-3 text-sm text-status-error" role="alert">
+          {props.liveClash ? (
+            <p>
+              {AVAILABILITY_REASON_TEXT[props.liveClash.event.payload.reason]} some of these nights (at{' '}
+              <span className="font-mono">{clockTime(Date.parse(props.liveClash.event.timestamp))}</span>). They can’t be booked
+              any more.
+            </p>
+          ) : (
+            <p>Some of these nights are already taken (struck through in the calendar).</p>
+          )}
+          {props.liveClash && props.liveClash.shownAt !== null && (
+            <p className="text-xs text-fg-muted">This page updated {notificationLatencyMs(props.liveClash)} ms after the change, without a refresh.</p>
+          )}
+          <button type="button" onClick={chooseNewDates} className="rounded-full border border-line-strong px-3 py-1 font-semibold text-fg hover:bg-surface-2">
+            Choose new dates
+          </button>
+        </div>
       )}
 
       {datesPicked && nights > 0 && (
@@ -176,7 +200,7 @@ function BookingPanel(props: Props) {
 
       <button
         type="submit"
-        disabled={!datesPicked || submitting || inactive}
+        disabled={!datesPicked || submitting || inactive || looksUnavailable}
         className="w-full rounded-full bg-primary py-3 font-semibold text-on-primary hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Sending request…' : 'Request to book'}
