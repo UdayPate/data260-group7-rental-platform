@@ -52,6 +52,16 @@ export function ChevronDownIcon({ className }: IconProps) {
   )
 }
 
+// A four-point sparkle with a small one beside it (the AI assistant button).
+export function SparkleIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M10 2.5c.5 3.9 2.6 6 6.5 6.5-3.9.5-6 2.6-6.5 6.5-.5-3.9-2.6-6-6.5-6.5 3.9-.5 6-2.6 6.5-6.5z" />
+      <path d="M18 13.5c.3 2.1 1.4 3.2 3.5 3.5-2.1.3-3.2 1.4-3.5 3.5-.3-2.1-1.4-3.2-3.5-3.5 2.1-.3 3.2-1.4 3.5-3.5z" />
+    </svg>
+  )
+}
+
 export function HouseIcon({ className }: IconProps) {
   return (
     <svg

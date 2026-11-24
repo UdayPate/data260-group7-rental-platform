@@ -1,4 +1,4 @@
-# Cedar & Rye: Data Contract (User, Property, Booking services)
+# Cedar & Rye: Data Contract (User, Property, Booking, AI services)
 
 This is the JSON contract between the React frontend and the backend services. The
 frontend types in `frontend/src/types/` and the mock server in `frontend/src/mocks/`
@@ -8,9 +8,9 @@ frontend changes.
 The frontend lead (Uday) owns the data shapes in this document, so treat them as final.
 To change something, ask him first so the types and mocks change at the same time.
 
-Covered so far: **User**, **Property**, and **Booking** services (all endpoints), plus the
+Covered so far: **User**, **Property**, **Booking** and **AI Agent** services (all endpoints), plus the
 entity shapes for messages, threads, and reviews. The request and response bodies for
-Messaging, Review, Analytics, and AI will be added when those pages are built.
+Messaging, Review and Analytics will be added when those pages are built.
 
 ---
 
@@ -374,7 +374,180 @@ One endpoint, three actions:
 
 ---
 
-## 6. Mock reference data
+## 6. AI Agent Service (owner: Himja)
+
+The UI starts a recommendation, watches the debate live over a WebSocket, and then the guest
+approves, edits or rejects the result. Types: `frontend/src/types/ai.ts`. Mock:
+`frontend/src/mocks/ai/` (it runs a full debate on the seed data).
+
+### 6.1 Endpoints
+
+| Endpoint | Request | Response |
+|---|---|---|
+| `POST /ai/requests` | `{ "guest_id", "request_text" (10–500 chars), "demo"?: { "delay_risk_agent"?: bool, "invalid_agent_output"?: bool } }` | `202 { "task_id", "trace_id", "status": "waiting" }` |
+| `GET /ai/tasks/{task_id}` | none | `{ "task": AiTask, "events": StreamEvent[] }`: the task **and every event so far**, in `seq` order (so a reload rebuilds the debate) |
+| `GET /ai/results/{task_id}` | none | `AiResult`; `409 INVALID_STATUS` while the debate is still running |
+| `POST /ai/tasks/{task_id}/approve` | `{ "guest_id", "edits"?: { "property_id"?, "rationale"? }, "reason"? }` | updated `AiResult`. With any real edit, the decision is `"edited"`, otherwise `"approved"`. `edits.property_id` must be one of `result.ranked` (else `400`). |
+| `POST /ai/tasks/{task_id}/reject` | `{ "guest_id", "reason" }` (reason required) | updated `AiResult` with decision `"rejected"` |
+| WebSocket `/ai/tasks/{task_id}/stream?after_seq=N` | none | see 6.3 |
+
+Errors use the normal error format: unknown task `404`; a different guest approving or rejecting
+`403 UNAUTHORIZED`; approving/rejecting before the result exists, or a second time,
+`409 INVALID_STATUS`; bad input `400`. The UI never sees the agents directly, only these endpoints.
+
+**Human approval (spec 7.5.1):** approving does **not** book anything. The UI shows a link to the
+booking page, and the guest sends the booking request themselves. No agent may confirm a
+booking, change availability or send a message.
+
+### 6.2 Shapes
+
+**AiTask**
+
+| Field | Type | Notes |
+|---|---|---|
+| task_id | string | e.g. `"task_001"` |
+| trace_id | string | UUID; **never changes** across the whole workflow (request, every round, challenge, vote, result, approval) |
+| guest_id | string | |
+| request_text | string | |
+| status | TaskStatus | `"waiting"`, `"planning"`, `"in_debate"`, `"waiting_for_approval"`, `"completed"`, `"failed"`, `"timed_out"` (spec 7.5.1) |
+| demo | `{ delay_risk_agent: bool, invalid_agent_output: bool }` | the demo switches used (both `false` by default) |
+| plan | Plan \| null | |
+| requirements | ParsedRequirements \| null | |
+| created_datetime / updated_datetime | datetime | |
+| error | string \| null | |
+
+**Plan** (spec 7.5.2): `{ plan_id, trace_id, created_datetime, steps: PlanStep[] }`.
+**PlanStep**: `{ step_id ("s1"…), order, title, input, expected_output, agent, status, note }`, where `status` is
+`"pending" | "in_progress" | "done" | "skipped" | "failed"`. The 7 steps are the spec's: read requirements (parser),
+retrieve properties, independent rankings, find disagreements, challenges and responses,
+re-check availability (chair), prepare the recommendation (explanation). A skipped or failed step
+must have a `note` explaining why (never continue silently).
+
+**ParsedRequirements**: `{ location, check_in, check_out, dates_assumed, guest_count, max_nightly_price, min_rating, amenities[], property_types[] }`;
+anything not mentioned is `null` (or `[]`). If the request has no dates, the parser picks some
+and sets `dates_assumed: true`.
+
+**AgentId**: `"parser"`, `"matcher"`, `"risk"`, `"fairness"`, `"explanation"`, `"chair"`.
+Analysis agents (round 0 opinions, round 2 votes): `matcher`, `risk`, `fairness`.
+
+**RankedProperty**: `{ property_id, title, score (0–1), reasons: string[] }`.
+
+**AiResult**
+
+| Field | Type | Notes |
+|---|---|---|
+| task_id, trace_id | string | |
+| recommended | `RankedProperty + { nightly_price, city }` \| null | `null` = nothing matched (then `suggestions` is filled) |
+| ranked | same type, array | top 5 candidates; the guest may pick one of these when editing |
+| confidence | number 0–1 | |
+| rationale | string | the plain-language explanation (generated text) |
+| evidence | `{ fact, source }[]` | **measured** facts (price, rating, availability check, host stats), kept apart from the generated text (spec 13.6) |
+| risks | `{ severity: "low"\|"medium"\|"high", text, source_agent }[]` | |
+| consensus | boolean | `true` if a majority of the three analysis agents voted for the winner and none is missing |
+| decision_rule | string \| null | the written rule the chair used when there was no consensus |
+| dissent | `{ agent, preferred_property_id, reason }[]` | agents that voted for something else |
+| dissent_note | string \| null | plain-language summary of who disagreed and why, plus missing agents |
+| missing_agents | `{ agent, round, reason }[]` | agents that timed out or whose output was dropped |
+| comparison | `{ rejected_property_id, rejected_title, why_lower }` \| null | recommended vs. the strongest rejected alternative (spec 13.6) |
+| suggestions | string[] | only when nothing matched (travel coach style hints) |
+| check_in, check_out, guest_count | from the requirements | carried to the booking page |
+| human_decision | HumanDecision \| null | |
+| created_datetime | datetime | when the result was published |
+
+**HumanDecision**: `{ decision: "approved"|"edited"|"rejected", guest_id, reason, edited_property_id, edited_rationale, decided_datetime }`.
+These are the spec's approval categories (7.3.2).
+
+### 6.3 The stream
+
+`WebSocket /ai/tasks/{task_id}/stream?after_seq=N` (`ws://` or `wss://` on the AI service's host):
+
+1. On connect, the server **replays every event with `seq > N`**, in order, then sends new events live.
+   The UI loads `GET /ai/tasks/{id}` first and connects with its last `seq`, so nothing is missed or doubled.
+2. Each message is one JSON **StreamEvent** (below). Same shape as the saved history.
+3. When the task is finished (`completed`, `failed`, `timed_out`), the server closes with code
+   **1000**. Unknown task: close with **4404**. The UI does not reconnect after 1000 or 4000+. On any
+   other drop it reconnects with backoff (1, 2, 4, 8 s) using its latest `after_seq`.
+4. The stream stays open during `waiting_for_approval`, so `decision.recorded` arrives live.
+
+**StreamEvent**: the shared Kafka envelope plus `seq`, so Kafka records can be forwarded as-is:
+
+```json
+{
+  "event_type": "vote.cast",
+  "trace_id": "6f1c2a9e-…",
+  "timestamp": "2026-11-23T18:05:09.412Z",
+  "actor_id": "fairness",
+  "entity": { "entity_type": "ai_task", "entity_id": "task_001" },
+  "idempotency_key": "task_001:27",
+  "seq": 27,
+  "payload": { "round": 2, "vote": "switch", "property_id": "p_001", "reason": "…" }
+}
+```
+
+- `timestamp`: UTC **with milliseconds**; the UI uses it to measure WebSocket delivery latency.
+- `actor_id`: an AgentId, `"harness"` (status, plan steps, timeouts, rejected outputs) or the `guest_id` (decision).
+- `seq`: 1, 2, 3 … per task, no gaps; `idempotency_key` = `"<task_id>:<seq>"`.
+
+| event_type | Who sends it | payload |
+|---|---|---|
+| `task.status` | harness | `{ status, note }` |
+| `plan.created` | chair | `{ plan }` |
+| `plan.step_updated` | harness | `{ step_id, status, note }` |
+| `requirements.parsed` | parser | `{ requirements, candidate_ids[] }` |
+| `round.started` | chair | `{ round: 0\|1\|2, deadline_ms, waiting_for: AgentId[] }` |
+| `opinion.published` | matcher / risk / fairness | `{ round: 0, ranked: RankedProperty[], confidence, reasoning }` (round 0 = `debate.round.0`) |
+| `agent.output_rejected` | harness | `{ agent, round, reason, invalid_fields[], action: "retry"\|"dropped" }` |
+| `reflection.recorded` | the agent | `{ round, cycle (1 or 2), checks: { constraint, evidence, risk, conflict, action } (each `{ result: "pass"\|"concern", note }`), decision: "keep"\|"revise"\|"reject" }` (spec 7.5.3) |
+| `disagreement.detected` | chair | `{ round: 0, score (0–1), method, top_picks: { agent, property_id }[], summary }` |
+| `challenge.issued` | chair | `{ round: 1, challenge_id, to_agent, about_property_id, question }` (`debate.round.1`) |
+| `challenge.answered` | the challenged agent | `{ round: 2, challenge_id, answer, evidence[] }` (`debate.round.2`) |
+| `vote.cast` | matcher / risk / fairness | `{ round: 2, vote: "keep"\|"switch"\|"abstain", property_id, reason }` (every vote has a reason) |
+| `agent.timed_out` | harness | `{ agent, round, deadline_ms, reason, fallback }` |
+| `result.published` | chair | `{ result: AiResult }` (`ai.results`) |
+| `decision.recorded` | guest | `{ decision: HumanDecision }` |
+
+### 6.4 Debate rules (team decisions)
+
+1. **Disagreement** = `1 − (agents agreeing with the most common #1 pick ÷ agents that published)`,
+   from 0 (all agree) to ~0.67 (three different picks). The chair challenges when it is above 0.
+2. **The Fairness Auditor is always challenged at least once** (spec 7.2), even when everyone agrees.
+3. **Deadlines:** each round has `deadline_ms` (8 s in the mock for rounds 0 and 2). An agent
+   that misses it gets an `agent.timed_out` event, the debate **continues with the agents that
+   answered** (spec 13.10), and the agent is listed in `result.missing_agents` and the `dissent_note`.
+   The mock counts a timed-out agent's round-0 pick as half a vote.
+4. **Votes and decision rule:** each analysis agent casts one vote with a reason. A strict majority
+   means consensus. Otherwise the chair applies its written `decision_rule`: on a tie, the
+   listing with fewer risk flags wins, then the lower price. Disagreement is never hidden:
+   `dissent` and `dissent_note` list every agent that disagreed.
+5. **Harness checks:** an agent output with an unknown `property_id`, a score outside 0–1, a
+   missing field or a wrong `trace_id` is rejected with `agent.output_rejected` (one retry, then
+   `dropped` and the agent counts as missing).
+
+### 6.5 Demo failure modes (spec 7.5.5)
+
+Optional `demo` flags on `POST /ai/requests`, both **off by default**:
+
+| Flag | What the service must do |
+|---|---|
+| `delay_risk_agent: true` | Make the Risk agent miss its round-2 deadline → `agent.timed_out` for `risk`, the debate continues, and the result lists `risk` in `missing_agents`. |
+| `invalid_agent_output: true` | Make one agent (the mock uses the Matcher, round 0) return an invalid output → `agent.output_rejected` with `action: "retry"`, then the agent's valid output. |
+
+### 6.6 Trace isolation (spec 13.11, mandatory)
+
+Three or more debates can run at the same time. To keep them apart:
+
+1. **Kafka key = `trace_id`** on every AI topic (`ai.requests`, `debate.round.0/1/2`, `ai.results`),
+   so one debate's messages stay in order on one partition.
+2. Every event carries both `trace_id` and `entity.entity_id` (= `task_id`). A chair or agent
+   **only consumes messages whose `trace_id` belongs to its task**.
+3. The WebSocket for a task **must only send events whose `trace_id` and `entity_id` match that task.**
+4. The UI double-checks: any event with another `trace_id` or `task_id` is **dropped**, logged as
+   `[ai-stream] DROPPED event from another trace` in the browser console, and counted on the page.
+   A debate page must never show another debate's messages.
+
+---
+
+## 7. Mock reference data
 
 The frontend mocks start from fixed seed data (`frontend/src/mocks/data/`) that you can use to
 compare responses:

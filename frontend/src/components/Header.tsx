@@ -1,5 +1,6 @@
 import { Link, NavLink, useLocation, useNavigate } from 'react-router'
 import { mocksEnabled } from '../config'
+import { isHostPath } from '../mode'
 import FilterStrip from './FilterStrip'
 import HostFilterStrip from './HostFilterStrip'
 import SearchBar from './SearchBar'
@@ -29,9 +30,9 @@ function Header() {
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
 
-  // The mode comes from the URL: host pages live under /host (plus the host dashboard).
-  // No separate state, so the toggle and the page can never disagree.
-  const isHost = pathname.startsWith('/host') || pathname === '/dashboards/host'
+  // The mode comes from the URL (see mode.ts). No separate state, so the toggle
+  // and the page can never disagree.
+  const isHost = isHostPath(pathname)
   const navItems = isHost ? hostNav : guestNav
   const onSearchPage = pathname === '/'
 

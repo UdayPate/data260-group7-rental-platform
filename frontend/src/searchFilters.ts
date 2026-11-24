@@ -100,6 +100,32 @@ export function toSearchRequest(
   }
 }
 
+// ---------- AI assistant prefill (D4a) ----------
+
+// Turns the search filters into a plain request the AI parser understands, e.g.
+// "Stay in san jose from 2026-12-07 to 2026-12-09 for 2 people, under $250 per night,
+//  with parking and kitchen, rating ≥ 4.5". Returns '' when no filters are set.
+// Dates are written as YYYY-MM-DD because that's what the parser reads.
+// Minimum price isn't included: the parser would read "$100" as a budget.
+export function describeFiltersForAi(filters: SearchFilters, typeLabels: Record<PropertyType, string>, amenityLabels: Record<Amenity, string>): string {
+  let stay = 'Stay'
+  if (filters.types.length > 0) stay = `A ${filters.types.map((t) => typeLabels[t].toLowerCase()).join(' or ')}`
+  if (filters.location) stay += ` in ${filters.location}`
+  if (filters.check_in && filters.check_out) stay += ` from ${filters.check_in} to ${filters.check_out}`
+  if (filters.guests !== null) stay += ` for ${filters.guests} ${filters.guests === 1 ? 'person' : 'people'}`
+
+  const extras: string[] = []
+  if (filters.max_price !== null) extras.push(`under $${filters.max_price} per night`)
+  if (filters.amenities.length > 0) {
+    const names = filters.amenities.map((a) => amenityLabels[a].toLowerCase())
+    extras.push(`with ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]}`)
+  }
+  if (filters.min_rating !== null) extras.push(`rating ≥ ${filters.min_rating}`)
+
+  const nothingSet = stay === 'Stay' && extras.length === 0
+  return nothingSet ? '' : [stay, ...extras].join(', ')
+}
+
 // ---------- Host "My listings" filters (URL: /host/listings?location=...&types=...&status=active) ----------
 
 export type HostListingFilters = {
