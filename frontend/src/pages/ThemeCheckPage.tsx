@@ -1,4 +1,5 @@
 // Developer-only page (at /theme-check) to eyeball the Cedar & Rye theme tokens.
+import BrandLogo from '../components/BrandLogo'
 // Not part of the spec: delete this file and its route once the theme is settled.
 
 // Token names from the @theme block in index.css.
@@ -16,8 +17,8 @@ const colorTokens = [
 function ThemeCheckPage() {
   return (
     <section className="space-y-10">
-      <h1 className="font-display text-5xl font-extrabold">
-        Cedar <span className="text-primary">&amp;</span> Rye
+      <h1 className="text-5xl">
+        <BrandLogo />
       </h1>
 
       <div>

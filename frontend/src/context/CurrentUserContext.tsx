@@ -25,8 +25,12 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     setHostIdState(id)
   }
 
+  // Bumped after a guest is created or deleted; the header picker reloads its list when it changes.
+  const [usersVersion, setUsersVersion] = useState(0)
+  const refreshUsers = () => setUsersVersion((n) => n + 1)
+
   return (
-    <CurrentUserContext.Provider value={{ guestId, hostId, setGuestId, setHostId }}>
+    <CurrentUserContext.Provider value={{ guestId, hostId, setGuestId, setHostId, usersVersion, refreshUsers }}>
       {children}
     </CurrentUserContext.Provider>
   )

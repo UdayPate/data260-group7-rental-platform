@@ -24,3 +24,13 @@ export const searchGuests = (body: SearchGuestsRequest) => post<PagedResponse<Gu
 export const createHost = (body: CreateHostRequest) => post<Host>(base, '/hosts/create', body)
 export const getHost = (body: GetHostRequest) => post<Host>(base, '/hosts/get', body)
 export const updateHost = (body: UpdateHostRequest) => post<Host>(base, '/hosts/update', body)
+
+// Display names for a set of guest ids ("Alex Chen"). A guest that can't be loaded
+// (e.g. deleted) is simply left out, so callers can show "Former guest".
+export async function loadGuestNames(guestIds: string[]): Promise<Record<string, string>> {
+  const unique = [...new Set(guestIds)]
+  const guests = await Promise.all(unique.map((id) => getGuest({ guest_id: id }).catch(() => null)))
+  const names: Record<string, string> = {}
+  for (const g of guests) if (g) names[g.guest_id] = `${g.first_name} ${g.last_name}`
+  return names
+}

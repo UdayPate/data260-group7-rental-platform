@@ -8,6 +8,8 @@ export type CurrentUser = {
   hostId: string // the host we're acting as in host mode
   setGuestId: (id: string) => void
   setHostId: (id: string) => void
+  usersVersion: number // goes up whenever a guest is created or deleted
+  refreshUsers: () => void // call after creating/deleting a guest so the "Viewing as" list reloads
 }
 
 export const CurrentUserContext = createContext<CurrentUser | null>(null)

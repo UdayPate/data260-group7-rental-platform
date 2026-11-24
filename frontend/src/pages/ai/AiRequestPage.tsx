@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { createAiRequest } from '../../api/ai'
+import { BRAND } from '../../brand'
 import { errorMessage } from '../../api/client'
 import ErrorBanner from '../../components/ErrorBanner'
 import { useCurrentUser } from '../../context/useCurrentUser'
@@ -42,8 +43,8 @@ function AiRequestPage() {
       <div className="space-y-2">
         <h1 className="font-display text-4xl font-bold">AI Assistant</h1>
         <p className="text-fg-soft">
-          Describe your trip in your own words. Our agents each rank the stays, argue about them in the open, and you approve,
-          edit or reject what they recommend. Nothing is booked without you.
+          Describe your trip in your own words. {BRAND.name}’s agents each rank the stays, argue about them in the open, and you
+          approve, edit or reject what they recommend. Nothing is booked without you.
         </p>
       </div>
 

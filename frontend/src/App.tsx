@@ -10,6 +10,7 @@ import GuestDashboardPage from './pages/dashboards/GuestDashboardPage'
 import HostDashboardPage from './pages/dashboards/HostDashboardPage'
 import PlatformDashboardPage from './pages/dashboards/PlatformDashboardPage'
 import GuestMessagesPage from './pages/guest/GuestMessagesPage'
+import GuestProfileNewPage from './pages/guest/GuestProfileNewPage'
 import GuestProfilePage from './pages/guest/GuestProfilePage'
 import PropertyDetailsPage from './pages/guest/PropertyDetailsPage'
 import ReservationStatusPage from './pages/guest/ReservationStatusPage'
@@ -20,6 +21,7 @@ import HostAvailabilityPage from './pages/host/HostAvailabilityPage'
 import HostListingsPage from './pages/host/HostListingsPage'
 import HostMessagesPage from './pages/host/HostMessagesPage'
 import HostReservationsPage from './pages/host/HostReservationsPage'
+import HostReviewsPage from './pages/host/HostReviewsPage'
 import ListingFormPage from './pages/host/ListingFormPage'
 
 // Every URL in the app. All pages render inside AppLayout (header + page).
@@ -32,6 +34,7 @@ function App() {
         <Route path="/" element={<SearchPage />} />
         <Route path="/properties/:propertyId" element={<PropertyDetailsPage />} />
         <Route path="/guest/profile" element={<GuestProfilePage />} />
+        <Route path="/guest/profile/new" element={<GuestProfileNewPage />} />
         <Route path="/guest/trips" element={<TripsPage />} />
         <Route path="/guest/trips/:reservationId" element={<ReservationStatusPage />} />
         <Route path="/guest/messages" element={<GuestMessagesPage />} />
@@ -43,6 +46,7 @@ function App() {
         <Route path="/host/listings/:propertyId/edit" element={<ListingFormPage />} />
         <Route path="/host/listings/:propertyId/availability" element={<HostAvailabilityPage />} />
         <Route path="/host/reservations" element={<HostReservationsPage />} />
+        <Route path="/host/reviews" element={<HostReviewsPage />} />
         <Route path="/host/messages" element={<HostMessagesPage />} />
 
         {/* AI */}

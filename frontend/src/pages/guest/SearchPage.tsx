@@ -1,7 +1,7 @@
 // Guest search results. The filters come from the URL (set by the header search bar
 // and the cream filter strip); this page asks the Property Service and shows the cards.
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import { errorMessage } from '../../api/client'
 import { saveProperty, searchProperties } from '../../api/properties'
 import ErrorBanner from '../../components/ErrorBanner'
@@ -14,12 +14,24 @@ const PAGE_SIZE = 12 // results per "page"; "Show more" loads the next 12
 
 function SearchPage() {
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const { guestId } = useCurrentUser()
   const paramsString = searchParams.toString()
+  // A note passed by another page, e.g. after deleting a profile.
+  const notice = (location.state as { notice?: string } | null)?.notice
 
   // New filters or a different guest = a brand-new result list. Changing the key makes
   // React throw away the old <SearchResults> (and its state) and start a fresh one.
-  return <SearchResults key={`${paramsString}|${guestId}`} paramsString={paramsString} guestId={guestId} />
+  return (
+    <>
+      {notice && (
+        <div role="status" className="mb-6 rounded-2xl border border-status-ok bg-surface px-4 py-3 text-status-ok">
+          {notice}
+        </div>
+      )}
+      <SearchResults key={`${paramsString}|${guestId}`} paramsString={paramsString} guestId={guestId} />
+    </>
+  )
 }
 
 type ResultsProps = { paramsString: string; guestId: string }

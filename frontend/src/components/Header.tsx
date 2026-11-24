@@ -1,6 +1,9 @@
 import { Link, NavLink, useLocation, useNavigate } from 'react-router'
+import { BRAND } from '../brand'
 import { mocksEnabled } from '../config'
+import { useCurrentUser } from '../context/useCurrentUser'
 import { isHostPath } from '../mode'
+import BrandLogo from './BrandLogo'
 import FilterStrip from './FilterStrip'
 import HostFilterStrip from './HostFilterStrip'
 import SearchBar from './SearchBar'
@@ -20,6 +23,7 @@ const guestNav: NavItem[] = [
 const hostNav: NavItem[] = [
   { to: '/host/listings', label: 'Listings' },
   { to: '/host/reservations', label: 'Reservations' },
+  { to: '/host/reviews', label: 'Reviews' },
   { to: '/host/messages', label: 'Messages' },
   { to: '/dashboards/host', label: 'Dashboards' },
 ]
@@ -29,6 +33,7 @@ const hostNav: NavItem[] = [
 function Header() {
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
+  const { usersVersion } = useCurrentUser()
 
   // The mode comes from the URL (see mode.ts). No separate state, so the toggle
   // and the page can never disagree.
@@ -39,8 +44,12 @@ function Header() {
   return (
     <header className="border-b border-line bg-bg">
       <div className="mx-auto flex max-w-7xl items-center gap-6 px-6 py-3">
-        <Link to="/" className="font-display text-2xl font-extrabold whitespace-nowrap text-fg">
-          Cedar <span className="text-primary">&amp;</span> Rye
+        {/* Logo with the tagline underneath (tagline hidden on narrower screens). Both from brand.ts. */}
+        <Link to="/" className="leading-tight text-fg">
+          <BrandLogo className="block text-2xl" />
+          <span data-tagline className="hidden text-xs whitespace-nowrap text-fg-muted xl:block">
+            {BRAND.tagline}
+          </span>
         </Link>
 
         <nav className="flex gap-4">
@@ -65,8 +74,8 @@ function Header() {
             </span>
           )}
 
-          {/* key={...} makes React start a fresh picker when the mode changes */}
-          <UserPicker key={isHost ? 'host' : 'guest'} mode={isHost ? 'host' : 'guest'} />
+          {/* key={...} makes React start a fresh picker when the mode or the list of guests changes */}
+          <UserPicker key={`${isHost ? 'host' : 'guest'}-${usersVersion}`} mode={isHost ? 'host' : 'guest'} />
 
           {/* Guest/Host toggle: switching mode just goes to that area's start page. */}
           <div className="flex rounded-full bg-surface-2 p-1">

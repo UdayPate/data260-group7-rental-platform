@@ -3,8 +3,8 @@
 import { delay, http, HttpResponse } from 'msw'
 import type { Guest } from '../../types/guest'
 import type { Host } from '../../types/host'
-import { daysFromToday, nowDatetime } from '../dates'
-import { db, nextId } from '../db'
+import { daysFromToday, nowDatetime, today } from '../dates'
+import { db, holdsDates, nextId } from '../db'
 import { checkPaging, errorResponse, invalidJsonResponse, MOCK_DELAY_MS, paginate, readBody, requireFields } from '../responses'
 
 const isEmail = (value: unknown) => typeof value === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)
@@ -88,6 +88,16 @@ export const userHandlers = [
     if (missing) return missing
     const index = db.guests.findIndex((g) => g.guest_id === body.guest_id)
     if (index === -1) return guestNotFound(body.guest_id)
+
+    // Team rule C5a: not while the guest has upcoming pending/approved stays (same rule as deleting a listing).
+    const upcoming = db.reservations.filter((r) => r.guest_id === body.guest_id && holdsDates(r) && r.check_out > today())
+    if (upcoming.length > 0) {
+      return errorResponse(
+        'INVALID_STATUS',
+        `You have ${upcoming.length} upcoming trip(s). Cancel them before deleting your profile.`,
+        { reservation_ids: upcoming.map((r) => r.reservation_id) },
+      )
+    }
 
     db.guests.splice(index, 1)
     // Also forget the guest's saved properties.

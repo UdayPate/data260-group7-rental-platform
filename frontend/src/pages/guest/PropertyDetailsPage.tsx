@@ -7,6 +7,7 @@ import { errorMessage } from '../../api/client'
 import { getAvailability, getProperty, saveProperty } from '../../api/properties'
 import { getHost } from '../../api/users'
 import AvailabilityCalendar from '../../components/AvailabilityCalendar'
+import PropertyReviews from '../../components/PropertyReviews'
 import BookingPanel from '../../components/BookingPanel'
 import ErrorBanner from '../../components/ErrorBanner'
 import { HeartIcon, HouseIcon, StarIcon } from '../../components/icons'
@@ -234,6 +235,8 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
             <AvailabilityCalendar blocks={blocks} checkIn={checkIn} checkOut={checkOut} />
             <p className="text-xs text-fg-muted">Calendar as of when this page loaded (today is {localDate()}).</p>
           </div>
+
+          <PropertyReviews propertyId={property.property_id} rating={property.rating} reviewCount={property.review_count} />
         </div>
 
         {/* ---------- Right column: booking panel, stays in view while scrolling ---------- */}

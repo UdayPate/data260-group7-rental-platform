@@ -6,11 +6,13 @@ import type { Guest } from '../types/guest'
 import type { Host } from '../types/host'
 import type { Property } from '../types/property'
 import type { PriceBreakdown, Reservation } from '../types/reservation'
+import type { Review } from '../types/review'
 import { seedHostBlocks } from './data/availability'
 import { seedGuests } from './data/guests'
 import { seedHosts } from './data/hosts'
 import { seedProperties } from './data/properties'
 import { seedReservations } from './data/reservations'
+import { seedReviews } from './data/reviews'
 import { seedSaved, type SavedProperty } from './data/saved'
 import { nightsBetween, rangesOverlap } from './dates'
 
@@ -43,6 +45,7 @@ export function holdsDates(reservation: Reservation): boolean {
 const properties: Property[] = structuredClone(seedProperties)
 const hosts: Host[] = structuredClone(seedHosts)
 const saved: SavedProperty[] = structuredClone(seedSaved)
+const reviews: Review[] = structuredClone(seedReviews)
 
 const reservations: Reservation[] = seedReservations.map((seed) => {
   const property = properties.find((p) => p.property_id === seed.property_id)!
@@ -83,6 +86,7 @@ export const db = {
   reservations,
   availability,
   saved,
+  reviews,
   bookingBlockIds,
   // idempotency_key -> reservation_id: a repeated booking action returns the first result.
   idempotencyKeys: new Map<string, string>(),

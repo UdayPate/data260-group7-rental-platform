@@ -4,6 +4,7 @@ import { errorResponse } from '../responses'
 import { aiHandlers } from './ai'
 import { bookingHandlers } from './bookings'
 import { propertyHandlers } from './properties'
+import { reviewHandlers } from './reviews'
 import { userHandlers } from './users'
 
 export const handlers = [
@@ -11,6 +12,7 @@ export const handlers = [
   ...propertyHandlers,
   ...bookingHandlers,
   ...aiHandlers,
+  ...reviewHandlers,
 
   // Last: any other POST is an endpoint we haven't mocked yet. Answer with a clear
   // 404 instead of letting it fall through to the dev server.

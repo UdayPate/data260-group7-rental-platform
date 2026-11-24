@@ -14,6 +14,7 @@ export type ApiErrorCode =
   | 'DATE_CONFLICT' // 409
   | 'DUPLICATE_BOOKING' // 409
   | 'INVALID_STATUS' // 409: action not allowed in the reservation's current status
+  | 'DUPLICATE_REVIEW' // 409: this stay already has a review, or the review already has a reply
   | 'SERVICE_UNAVAILABLE' // 503
 
 // Body of every error response.

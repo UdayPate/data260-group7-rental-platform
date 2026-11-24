@@ -8,9 +8,9 @@ frontend changes.
 The frontend lead (Uday) owns the data shapes in this document, so treat them as final.
 To change something, ask him first so the types and mocks change at the same time.
 
-Covered so far: **User**, **Property**, **Booking** and **AI Agent** services (all endpoints), plus the
-entity shapes for messages, threads, and reviews. The request and response bodies for
-Messaging, Review and Analytics will be added when those pages are built.
+Covered so far: **User**, **Property**, **Booking**, **Review** and **AI Agent** services (all endpoints),
+plus the entity shapes for messages and threads. The request and response bodies for
+Messaging and Analytics will be added when those pages are built.
 
 ---
 
@@ -57,6 +57,7 @@ Every non-2xx response has this body:
 | `DATE_CONFLICT` | 409 | The requested dates overlap blocked or booked dates |
 | `DUPLICATE_BOOKING` | 409 | The same guest already has an active request for overlapping dates at this property (sent with a different idempotency key). `details.reservation_id` = the existing one. |
 | `INVALID_STATUS` | 409 | The action isn't allowed in the reservation's (or listing's) current status, e.g. approving an already-approved reservation |
+| `DUPLICATE_REVIEW` | 409 | The stay already has a review, or the review already has a host reply |
 | `SERVICE_UNAVAILABLE` | 503 | The service or a dependency it needs is down |
 
 If a response is not in this shape, the frontend shows a generic "request failed (HTTP 500)" message.
@@ -228,7 +229,7 @@ Non-paged lists use `{ "items": [ ... ] }`.
 | `POST /guests/create` | Guest **without** `guest_id`, `saved_properties_count`, `booking_count`, `profile_created_datetime` | `201` Guest |
 | `POST /guests/get` | `{ "guest_id" }` | Guest |
 | `POST /guests/update` | `{ "guest_id", ...only the fields being changed }` | updated Guest |
-| `POST /guests/delete` | `{ "guest_id" }` | `{ "guest_id", "deleted": true }` (also removes the guest's saved properties) |
+| `POST /guests/delete` | `{ "guest_id" }` | `{ "guest_id", "deleted": true }` (also removes the guest's saved properties). Returns `409 INVALID_STATUS` while the guest has upcoming pending or approved stays (`details.reservation_ids` lists them); past reservations and reviews are kept. |
 | `POST /guests/search` | `{ "query"?, "location"?, "page", "page_size" }`; `query` = contains-match on name or email, `location` = contains-match on location (both case-insensitive) | paged Guest |
 | `POST /hosts/create` | `{ "name", "email", "phone"?, "profile_photo_url"? }` | `201` Host |
 | `POST /hosts/get` | `{ "host_id" }` | Host |
@@ -337,6 +338,29 @@ One endpoint, three actions:
 | `POST /bookings/approve` | `{ "reservation_id", "host_id", "idempotency_key" }` | updated Reservation |
 | `POST /bookings/decline` | `{ "reservation_id", "host_id", "reason"?, "idempotency_key" }` | updated Reservation (reason saved in `cancellation_reason`) |
 | `POST /bookings/cancel` | `{ "reservation_id", "guest_id" **or** "host_id", "cancellation_reason", "idempotency_key" }`: send exactly one of guest_id / host_id | updated Reservation |
+
+### Review Service (owner: Himja)
+
+| Endpoint | Request body | Response |
+|---|---|---|
+| `POST /reviews/create` | `{ "reservation_id", "guest_id", "rating" (whole number 1–5), "review_text" (20–1000 characters after trimming) }` | `201` Review. The server fills `review_id`, `property_id`, `host_id` (from the reservation), `created_datetime`, `response_text: null`. |
+| `POST /reviews/get` | `{ "review_id" }` | Review |
+| `POST /reviews/byProperty` | `{ "property_id", "page", "page_size" }` | paged Review, **newest first** |
+| `POST /reviews/byGuest` | `{ "guest_id" }` | `{ "items": Review[] }` newest first. **Extension** (not in spec §6): lets the Trips page find completed stays that still need a review. |
+| `POST /reviews/respond` | `{ "review_id", "host_id", "response_text" (10–1000 characters) }` | updated Review |
+
+**Review rules (team decisions):**
+1. A review needs a reservation with status **`completed`** (else `409 INVALID_STATUS`), written by **that
+   reservation's guest** (else `403 UNAUTHORIZED`), and **one review per reservation** (else `409 DUPLICATE_REVIEW`).
+2. A new review **updates the listing**: `review_count + 1` and
+   `rating = round((old_rating × old_count + new_rating) ÷ (old_count + 1), 2)`.
+   (In the seed data a listing's `review_count` is its whole history; the Review Service may hold fewer
+   full review records. The UI shows "Showing N of M reviews" when that happens.)
+3. Only the **listing's host** may reply (`host_id` must match the review's `host_id`, else `403`), **once**
+   (else `409 DUPLICATE_REVIEW`).
+4. Reviews can't be edited or deleted. A deleted guest's reviews stay; the UI shows them as "Former guest".
+5. Kafka: publish `review.created` (spec 6.1) with the review as payload and `idempotency_key` = `review_id`,
+   so the Property Service can update the rating.
 
 ---
 
@@ -554,6 +578,7 @@ compare responses:
 - 8 hosts (`h_001`–`h_008`), 12 guests (`g_001`–`g_012`)
 - 30 properties (`p_001`–`p_030`) in San Jose, Sunnyvale and Mountain View; `p_012` is inactive
 - 24 reservations in every status, and 5 host-blocked date ranges
+- 6 reviews (`v_001`–`v_006`) on completed stays; `v_003` and `v_006` have no host reply yet, and Alex's completed stay `r_012` has no review
 
 Seed dates are relative to today, so they're always in the right past or future.
 The spec's demo search ("San Jose, 2 guests, ≤ $250, parking + kitchen, rating ≥ 4.5")
