@@ -4,7 +4,7 @@ Standing instructions for Claude Code in this repo. Read this first every sessio
 
 ## Project in one paragraph
 SJSU DATA-260 (Agentic AI & Distributed Systems) final group project. We are building an
-original Airbnb-style rental marketplace (NO Airbnb branding, name, or logo anywhere):
+original Airbnb-style rental marketplace called **Xenia** (NO Airbnb branding, name, or logo anywhere):
 React client → REST microservices → Kafka in the middle → MySQL + MongoDB + Redis, plus a
 FastAPI multi-agent AI recommendation service whose agents debate over Kafka topics.
 The full spec is `docs/spec/project_spec.pdf` — when a requirement is unclear, check it there.
@@ -43,45 +43,54 @@ tests/
 - Native WebSocket for live updates (AI debate stream, "dates no longer available").
   Put socket code in `src/realtime/`, with a mock emitter for development.
 
-## Visual theme: "Cedar & Rye" (mid-century retro, dark, but modern)
-Platform name is **Cedar & Rye** (logo: "Cedar & Rye" with the "&" in terracotta). Reference
-mockup: the "Cedar & Rye" board on our design canvas. Retro comes from the type pairing, the
-cream filter strip and warm accents; layout, spacing and interactions stay modern and clean.
-Put these as Tailwind theme tokens in an `@theme` block in `frontend/src/index.css` — never hard-code hex values in pages.
+## Visual theme: "Xenia" (a modern accommodation marketplace inside a Roman villa)
+Platform name is **Xenia** (Greek for hospitality to guests). Logo: a small gold arch mark,
+then "XENIA" in Cinzel capitals; tagline "Where every stay feels like belonging." (both from
+`frontend/src/brand.ts`). The interface stays dark and modern; the villa comes from the
+colors (taken from the hero photo), the Cinzel headings, travertine stone, arches and thin
+bronze rules. Layout, spacing and interactions stay modern and clean.
+Put these as Tailwind theme tokens in the `@theme` block in `frontend/src/index.css` — never hard-code hex values in pages.
 
 Colors:
 - `bg` #161311 (near-black, slightly warm) · `surface` #221E1B (cards, panels) · `surface-2` #2A2521 (inputs, toggles) · `line` #3D3630 · `line-strong` #5A5046 (borders)
-- `cream` #F1EADC — the light "strip" surface (filter bar, chair challenge cards, light callouts); text on cream is #2A2521, secondary #6B5D4D, chip border #D8CDB9
+- `bronze` #8A6A45 — thin decorative lines: the cornice rule under page headings, arch photo frames
+- `travertine` #E8DDC8 — the pale stone "strip" surface (filter bar, chair challenge cards, light callouts), with faint horizontal banding drawn in CSS (`.travertine-strip`); text on it is #2A2521, secondary #6B5D4D, chip border #D2C3A6
 - `fg` #F3ECE0 · `fg-soft` #E2D9CB · `fg-muted` #C9BDAB (text colors; never darker than this on dark backgrounds — must stay readable on a projector)
-- `primary` #E8673A (terracotta/orange) — main actions (Search, Approve, Book); text on it is #161311, not white
-- `mustard` #E3B04B — active filter chips (border #C9952F), "Guest favorite" badges, ratings ★, selected toggle, verdict outline (verdict fill #2A2418)
-- `teal` #3F8F8A — secondary accent for charts and info states
+- `primary` #E8673A (terracotta) — main actions (Search, Approve, Book); text on it is #161311, not white
+- `gold` #D9B565 (antique gold) — active filter chips (border #A98A4C), "Guest favorite" badges, ratings ★, the logo mark, verdict outline (verdict fill #2A2418)
+- `olive` #6F8F3A — secondary color for charts, info states and success surfaces
 - Price pill: bg #2F2A25, border #4A423A
-- Status: available/approved #8FD19E · pending/partial #E3B04B · declined/cancelled/error #F19A8A (outline buttons use border #7A3A36)
+- Status: available/approved #8FD19E · pending/partial #D9B565 · declined/cancelled/error #F19A8A (outline buttons use border #7A3A36)
 - Agent colors (use everywhere — debate view, timelines, charts, votes): Matcher #7CC8E8 ·
-  Risk #F08A55 · Fairness Auditor #C9A8F0 · Chair #F3ECE0 · Parser #8FD19E · Explanation #E3B04B
-- Chart palette (in this order): #E8673A, #3F8F8A, #E3B04B, #7CC8E8, #C9A8F0, #8FD19E
+  Risk #F08A55 · Fairness Auditor #C9A8F0 · Chair #F3ECE0 · Parser #8FD19E · Explanation #D9B565
+- Chart palette (in this order; charts use at most the first 4): #E8673A, #7CC8E8, #6F8F3A, #D9B565, #C9A8F0, #8FD19E.
+  Olive is 3rd because next to terracotta it fails the red-green color-blind check. Re-run the
+  dataviz palette validator after any color change.
 
 Type (Google Fonts):
-- **Fraunces** (700–800) — logo and a few big headings only (page titles like "The Debate")
+- **Cinzel** (600–700) — the XENIA logo, page titles and big headings (e.g. "The Forum")
 - **Barlow Condensed** (600–700) — listing titles, section headings (often UPPERCASE, e.g.
   "28 STAYS NEAR SAN JOSE"), prices, KPI numbers, small labels with 0.06–0.08em letter-spacing
 - **Barlow** (400–600) — all body and UI text
 - **DM Mono** — IDs (trace_id, booking IDs), timestamps, and numeric table columns
 
 Components and details:
-- Header: dark, logo left, nav, pill search bar with orange Search button, mustard Guest/Host toggle
-- Cream filter strip directly under the header, full width, holding the spec's filters as pills
-  (active = mustard, inactive = white with #D8CDB9 border) — on host pages the same strip holds listing filters
-- Cards: `surface` with 1px `line` border, 16px radius; property photo on top (190px tall, cover),
-  mustard "★ Guest favorite" badge top-left, round save/heart button top-right (filled terracotta when saved)
+- Header: dark, logo left, nav, pill search bar with terracotta Search button (hidden on log in / sign up and on the home page, whose hero has its own)
+- Home page (logged-out visitors only, at `/`): full-width hero photo (`public/photos/hero.jpg`, no extra arch frame) fading into the dark background, with XENIA, the tagline and the search bar on the dark fade; then 3 featured stays and the 3-step "How the AI concierge works" strip. Logged-in users land on `/search`.
+- Travertine filter strip directly under the header on `/search`, full width, holding the spec's filters as pills
+  (active = gold, inactive = white with #D2C3A6 border) — on host "My listings" the same strip holds listing filters
+- Cards: `surface` with 1px `line` border, 16px radius; property photo inset at the top with an arched top
+  (`.arch-photo`: shallow elliptical arch, thin bronze frame; also used on the property page), 190px tall, cover;
+  house-icon tile when there is no photo or it fails to load; gold "★ Guest favorite" badge top-left, round save/heart button top-right (filled terracotta when saved)
+- Listing photos: `public/photos/p_001.jpg` … (about 1200px wide, under 250 KB). Originals stay in `public/photos/originals/` (git-ignored).
+- Big page headings get a thin double bronze rule underneath, like a classical cornice (`.cornice`)
 - Listing title in Barlow Condensed bold ~21px; meta line in fg-muted; price in the price pill
 - Buttons, inputs, chips, toggles: fully rounded (pill); primary = filled terracotta, secondary = outline
-- Debate panel: round labels in condensed uppercase; chair challenges on cream cards; final
-  verdict in a mustard-outlined card with Approve / Edit / Reject
+- Debate page is titled "The Forum" with the subtitle "the agents’ debate"; round labels in condensed uppercase; chair challenges on travertine cards; final
+  verdict in a gold-outlined card with Approve / Edit / Reject
 - Dashboards: same tokens; charts on `surface` cards; KPI numbers in Barlow Condensed
 
-Keep it modern: no skeuomorphic textures, no gradient washes, no emoji as icons (use inline
+Keep it modern: no stone texture images on dark surfaces, no gradient washes (the only gradient is the hero photo's fade into the background), no emoji as icons (use inline
 SVG or one icon set I approve). Text contrast ≥ 4.5:1.
 
 ## API contract rules
@@ -134,8 +143,10 @@ those dates, a WebSocket event must mark the dates unavailable without a page re
 the booking button must be blocked so a stale booking cannot be submitted. Log the
 event-received timestamp so we can measure notification latency.
 
-**Mode switch:** a simple guest/host switcher (and a demo user picker) is fine — no real auth
-required unless I say so.
+**Login and roles:** real JWT login (sign up / log in, token kept per browser tab in
+sessionStorage). Each account has one role: guest, host or admin; the role decides the nav
+and which pages and endpoints it may use (see "Authentication and roles" in
+`docs/api/data-contract.md`). The demo accounts all use the password `demo1234` (README).
 
 ## How to work with me
 - **Work in chunks.** I name a chunk of work (e.g. "property details and booking"). For each chunk:

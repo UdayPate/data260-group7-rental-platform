@@ -5,9 +5,10 @@
 // !! DEVELOPMENT ONLY !! This secret is in frontend code, so anyone can read it.
 // The real services must NEVER use it: their JWT_SECRET lives only in each service's
 // .env file, which is never committed (see docs/api/data-contract.md).
+import { apiBaseUrls } from '../../config'
 import type { Role, TokenClaims } from '../../types/auth'
 
-export const DEV_ONLY_JWT_SECRET = 'cedar-rye-mock-secret-DO-NOT-USE-IN-REAL-SERVICES'
+export const DEV_ONLY_JWT_SECRET = 'xenia-mock-secret-DO-NOT-USE-IN-REAL-SERVICES'
 
 export const TOKEN_LIFETIME_SECONDS = 8 * 60 * 60 // one fixed expiry: 8 hours
 
@@ -40,13 +41,18 @@ export async function signToken(user: { id: string; role: Role; name: string }):
 export type VerifyResult = { ok: true; claims: TokenClaims } | { ok: false; reason: 'invalid' | 'expired' }
 
 // Checks the signature first, then the expiry. Anything malformed is "invalid".
+// When the real User Service issues the tokens (VITE_USER_API_BASE_URL is set), the mocks
+// can't know its secret, so they skip the signature and only read the claims and expiry.
+// (Mock-only shortcut: every real service always checks the signature.)
 export async function verifyToken(token: string): Promise<VerifyResult> {
   const parts = token.split('.')
   if (parts.length !== 3) return { ok: false, reason: 'invalid' }
   const [header, payload, signature] = parts
   try {
-    const valid = await crypto.subtle.verify('HMAC', await hmacKey(), fromBase64url(signature), utf8.encode(`${header}.${payload}`))
-    if (!valid) return { ok: false, reason: 'invalid' }
+    if (apiBaseUrls.users === '') {
+      const valid = await crypto.subtle.verify('HMAC', await hmacKey(), fromBase64url(signature), utf8.encode(`${header}.${payload}`))
+      if (!valid) return { ok: false, reason: 'invalid' }
+    }
     const claims = JSON.parse(new TextDecoder().decode(fromBase64url(payload))) as TokenClaims
     if (typeof claims.exp !== 'number' || claims.exp * 1000 <= Date.now()) return { ok: false, reason: 'expired' }
     return { ok: true, claims }

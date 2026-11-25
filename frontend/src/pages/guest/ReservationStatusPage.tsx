@@ -165,7 +165,7 @@ function ReservationStatus({ reservationId, guestId }: Props) {
 
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-3xl font-bold">Your reservation</h1>
+          <h1 className="cornice font-display text-3xl font-bold">Your reservation</h1>
           <StatusBadge status={reservation.status} />
         </div>
         <p className="text-fg-soft">{statusExplanation(reservation)}</p>
@@ -262,7 +262,7 @@ function ReservationStatus({ reservationId, guestId }: Props) {
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={2}
-              className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg focus:border-mustard focus:outline-none"
+              className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg focus:border-gold focus:outline-none"
             />
           </label>
           {cancelError && <ErrorBanner message={cancelError} onDismiss={() => setCancelError(null)} />}

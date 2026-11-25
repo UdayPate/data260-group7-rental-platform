@@ -61,7 +61,7 @@ export function RerunPanel({ task, guestId }: { task: AiTask; guestId: string })
               aria-label={WEIGHT_LABELS[key]}
               data-weight={key}
               onChange={(e) => setWeights({ ...weights, [key]: Number(e.target.value) })}
-              className="accent-mustard"
+              className="accent-gold"
             />
             <span className="text-right font-mono">
               {weights[key].toFixed(2)} <span className="text-fg-muted">({sharePercent(weights, key)}%)</span>

@@ -1,5 +1,5 @@
 // Guest search results. The filters come from the URL (set by the header search bar
-// and the cream filter strip); this page asks the Property Service and shows the cards.
+// and the travertine filter strip); this page asks the Property Service and shows the cards.
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { trackEvent } from '../../api/analytics'
@@ -159,7 +159,7 @@ function SearchResults({ paramsString, guestId }: ResultsProps) {
       {!loading && !error && items.length === 0 && (
         <div className="rounded-2xl border border-line bg-surface p-8 text-center">
           <p className="text-fg-soft">No stays match these filters.</p>
-          <Link to="/" className="mt-2 inline-block font-semibold text-primary hover:underline">
+          <Link to="/search" className="mt-2 inline-block font-semibold text-primary hover:underline">
             Clear all filters
           </Link>
         </div>

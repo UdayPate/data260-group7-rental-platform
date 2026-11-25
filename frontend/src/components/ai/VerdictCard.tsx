@@ -1,4 +1,4 @@
-// The chair's final verdict (mustard-outlined card) with the human-in-the-loop step:
+// The chair's final verdict (gold-outlined card) with the human-in-the-loop step:
 // Approve, Edit (pick another candidate and/or rewrite the explanation, U2a), or Reject.
 // Approving never books anything: it only links to the booking page (U3a).
 import { useState } from 'react'
@@ -21,7 +21,7 @@ type Props = {
 
 const SEVERITY_CLASS = { high: 'text-status-error', medium: 'text-status-pending', low: 'text-fg-muted' }
 const labelClass = 'font-condensed text-xs font-bold tracking-[0.08em] text-fg-muted uppercase'
-const boxClass = 'w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg focus:border-mustard focus:outline-none'
+const boxClass = 'w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg focus:border-gold focus:outline-none'
 
 function VerdictCard({ taskId, guestId, result, decision, canAct, onDecided }: Props) {
   const [mode, setMode] = useState<'idle' | 'edit' | 'reject'>('idle')
@@ -66,9 +66,9 @@ function VerdictCard({ taskId, guestId, result, decision, canAct, onDecided }: P
   const editChanged = pickedId !== rec?.property_id || rationale.trim() !== result.rationale
 
   return (
-    <section data-verdict className="space-y-4 rounded-2xl border-2 border-mustard bg-verdict p-5">
+    <section data-verdict className="space-y-4 rounded-2xl border-2 border-gold bg-verdict p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="font-condensed text-xl font-bold tracking-[0.08em] text-mustard uppercase">Final verdict</h2>
+        <h2 className="font-condensed text-xl font-bold tracking-[0.08em] text-gold uppercase">Final verdict</h2>
         <span className="text-sm text-fg-soft">
           {result.consensus ? 'Consensus' : 'No consensus — decision rule applied'} · confidence{' '}
           <span className="font-mono">{Math.round(result.confidence * 100)}%</span>

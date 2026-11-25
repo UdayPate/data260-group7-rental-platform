@@ -56,7 +56,7 @@ function PropertyReviews({ propertyId, rating, reviewCount }: Props) {
         {reviewCount > 0 && (
           <span className="flex items-center gap-2 font-sans text-base font-normal tracking-normal normal-case text-fg-soft">
             {/* One star + the exact average: five whole stars would round 4.6 up to "perfect". */}
-            <StarIcon className="h-4 w-4 text-mustard" /> {rating.toFixed(2)} · {plural(reviewCount, 'review')}
+            <StarIcon className="h-4 w-4 text-gold" /> {rating.toFixed(2)} · {plural(reviewCount, 'review')}
           </span>
         )}
       </h2>
@@ -83,8 +83,8 @@ function PropertyReviews({ propertyId, rating, reviewCount }: Props) {
             </div>
             <p className="text-fg-soft">{r.review_text}</p>
             {r.response_text && (
-              <div className="rounded-xl border-l-4 border-mustard bg-surface-2 p-3 text-sm">
-                <p className="font-semibold text-mustard">Host’s reply</p>
+              <div className="rounded-xl border-l-4 border-gold bg-surface-2 p-3 text-sm">
+                <p className="font-semibold text-gold">Host’s reply</p>
                 <p className="text-fg-soft">{r.response_text}</p>
               </div>
             )}

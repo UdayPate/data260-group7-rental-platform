@@ -12,7 +12,7 @@ import UnreadBadge from './UnreadBadge'
 type NavItem = { to: string; label: string }
 
 const guestNav: NavItem[] = [
-  { to: '/', label: 'Search' },
+  { to: '/search', label: 'Search' },
   { to: '/guest/trips', label: 'Trips' },
   { to: '/guest/messages', label: 'Messages' },
   { to: '/ai', label: 'AI Assistant' },
@@ -34,12 +34,12 @@ const adminNav: NavItem[] = [
 ]
 
 // Logged out: only the public pages (search and property pages).
-const publicNav: NavItem[] = [{ to: '/', label: 'Search' }]
+const publicNav: NavItem[] = [{ to: '/search', label: 'Search' }]
 
 const NAV: Record<Role, NavItem[]> = { guest: guestNav, host: hostNav, admin: adminNav }
 
 // Layout: row 1 = logo, nav, mock badge, who is logged in + Log out (or Log in / Sign up);
-// row 2 = search bar (guests and logged-out visitors); then the cream filter strip
+// row 2 = search bar (guests and logged-out visitors); then the travertine filter strip
 // (search page, and the host's "My listings").
 function Header() {
   const { pathname, search } = useLocation()
@@ -47,8 +47,11 @@ function Header() {
 
   // The role in the token decides everything (no Guest/Host toggle any more).
   const navItems = user ? NAV[user.role] : publicNav
-  const showSearchBar = !user || user.role === 'guest'
-  const onSearchPage = pathname === '/'
+  const onSearchPage = pathname === '/search'
+  // Not on the log in / sign up pages (nothing to search there), and not on the
+  // logged-out home page, whose hero has its own search bar.
+  const onHomePage = pathname === '/' && !user
+  const showSearchBar = (!user || user.role === 'guest') && !['/login', '/signup'].includes(pathname) && !onHomePage
 
   return (
     <header className="border-b border-line bg-bg">
@@ -66,7 +69,6 @@ function Header() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/'} // "/" would otherwise count as active on every page
               className={({ isActive }) =>
                 `whitespace-nowrap ${isActive ? 'font-semibold text-fg' : 'text-fg-muted hover:text-fg'}`
               }
@@ -88,7 +90,7 @@ function Header() {
             <>
               <span data-account className="flex items-center gap-2 whitespace-nowrap">
                 <span className="text-fg">{user.name}</span>
-                <span className="rounded-full border border-mustard px-2 py-0.5 font-condensed text-xs font-bold tracking-[0.08em] text-mustard uppercase">
+                <span className="rounded-full border border-gold px-2 py-0.5 font-condensed text-xs font-bold tracking-[0.08em] text-gold uppercase">
                   {user.role}
                 </span>
               </span>

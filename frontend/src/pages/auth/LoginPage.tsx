@@ -49,7 +49,7 @@ function LoginPage() {
 
   return (
     <section className="mx-auto max-w-md space-y-6">
-      <h1 className="font-display text-4xl font-bold">Log in</h1>
+      <h1 className="cornice font-display text-4xl font-bold">Log in</h1>
       {note && (
         <p role="status" className="rounded-2xl border border-status-pending p-3 text-sm text-status-pending">
           {note}
@@ -98,7 +98,7 @@ function LoginPage() {
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-2 py-1 text-left hover:bg-surface-2"
                 >
-                  <span className="w-12 font-condensed text-xs font-bold tracking-[0.08em] text-mustard uppercase">{a.role}</span>
+                  <span className="w-12 font-condensed text-xs font-bold tracking-[0.08em] text-gold uppercase">{a.role}</span>
                   <span className="text-fg">{a.name}</span>
                   <span className="ml-auto font-mono text-xs text-fg-muted">{a.email}</span>
                 </button>

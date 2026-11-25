@@ -1,4 +1,4 @@
-# Cedar & Rye: Data Contract (User, Property, Booking, AI services)
+# Xenia: Data Contract (User, Property, Booking, AI services)
 
 This is the JSON contract between the React frontend and the backend services. The
 frontend types in `frontend/src/types/` and the mock server in `frontend/src/mocks/`

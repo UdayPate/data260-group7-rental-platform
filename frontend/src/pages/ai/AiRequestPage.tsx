@@ -41,7 +41,7 @@ function AiRequestPage() {
   return (
     <section className="max-w-3xl space-y-6">
       <div className="space-y-2">
-        <h1 className="font-display text-4xl font-bold">AI Assistant</h1>
+        <h1 className="cornice font-display text-4xl font-bold">AI Assistant</h1>
         <p className="text-fg-soft">
           Describe your trip in your own words. {BRAND.name}’s agents each rank the stays, argue about them in the open, and you
           approve, edit or reject what they recommend. Nothing is booked without you.
@@ -58,7 +58,7 @@ function AiRequestPage() {
             rows={4}
             maxLength={500}
             placeholder="e.g. 2 nights in San Jose for 2, under $250, parking, kitchen, rating ≥ 4.5"
-            className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-3 text-fg placeholder:text-fg-muted focus:border-mustard focus:outline-none"
+            className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-3 text-fg placeholder:text-fg-muted focus:border-gold focus:outline-none"
           />
         </label>
         <button type="button" onClick={() => setText(EXAMPLE)} className="text-sm font-semibold text-primary hover:underline">

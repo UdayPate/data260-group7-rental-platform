@@ -30,7 +30,7 @@ function deliver(event: AvailabilityEvent) {
 }
 
 // Only in a browser (the mock tests run in Node, with a single "tab").
-const channel = typeof window === 'undefined' ? null : new BroadcastChannel('cedar-rye-mock-availability')
+const channel = typeof window === 'undefined' ? null : new BroadcastChannel('xenia-mock-availability')
 
 // Called by the mock services right after they add or remove a block.
 export function publishAvailability(

@@ -110,10 +110,10 @@ function VersionsPanel() {
             const active = i === activeIndex
             const action = i > activeIndex ? 'promote' : 'rollback'
             return (
-              <article key={v.version_id} data-version={v.version_id} className={`space-y-3 rounded-2xl border bg-surface p-4 ${active ? 'border-mustard' : 'border-line'}`}>
+              <article key={v.version_id} data-version={v.version_id} className={`space-y-3 rounded-2xl border bg-surface p-4 ${active ? 'border-gold' : 'border-line'}`}>
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="font-mono text-lg">{v.version_id}</h3>
-                  <span data-version-status className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${active ? 'border-mustard text-mustard' : 'border-line-strong text-fg-muted'}`}>
+                  <span data-version-status className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${active ? 'border-gold text-gold' : 'border-line-strong text-fg-muted'}`}>
                     {active ? 'Active' : i > activeIndex ? 'Proposed' : 'Previous (kept for rollback)'}
                   </span>
                 </div>

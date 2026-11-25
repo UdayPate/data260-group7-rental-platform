@@ -1,5 +1,8 @@
 # data260-group7-rental-platform
 
+**Xenia**: Where every stay feels like belonging. A rental and booking platform with a multi-agent
+AI concierge (SJSU DATA-260, Group 7). How to run the frontend: see [`frontend/README.md`](frontend/README.md).
+
 ## Demo accounts
 
 With the frontend's mock data (or a backend seeded with the same data), every account below

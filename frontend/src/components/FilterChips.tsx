@@ -11,9 +11,9 @@ type ChipProps = {
   expanded?: boolean // for chips that open a panel
 }
 
-// One pill: mustard when active, white when not.
+// One pill: gold when active, white when not.
 export function Chip({ active, onClick, children, disabled = false, title, expanded }: ChipProps) {
-  const colors = active ? 'border-mustard-border bg-mustard' : 'border-cream-border bg-white'
+  const colors = active ? 'border-gold-border bg-gold' : 'border-travertine-border bg-white'
   return (
     <button
       type="button"
@@ -22,7 +22,7 @@ export function Chip({ active, onClick, children, disabled = false, title, expan
       title={title}
       aria-pressed={expanded === undefined ? active : undefined}
       aria-expanded={expanded}
-      className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap text-cream-ink ${colors} disabled:cursor-not-allowed disabled:opacity-50`}
+      className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap text-travertine-ink ${colors} disabled:cursor-not-allowed disabled:opacity-50`}
     >
       {children}
     </button>
@@ -32,7 +32,7 @@ export function Chip({ active, onClick, children, disabled = false, title, expan
 // The box that opens under a chip.
 export function PanelBox({ children }: { children: ReactNode }) {
   return (
-    <div className="absolute top-full left-0 z-20 mt-2 min-w-56 rounded-2xl border border-cream-border bg-white p-4 text-cream-ink shadow-lg">
+    <div className="absolute top-full left-0 z-20 mt-2 min-w-56 rounded-2xl border border-travertine-border bg-white p-4 text-travertine-ink shadow-lg">
       {children}
     </div>
   )

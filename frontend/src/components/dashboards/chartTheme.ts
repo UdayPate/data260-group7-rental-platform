@@ -1,4 +1,4 @@
-// Shared chart styling for Recharts, from the Cedar & Rye theme tokens (no hex values here).
+// Shared chart styling for Recharts, from the Xenia theme tokens (no hex values here).
 import { createElement } from 'react'
 // Recharts draws SVG and needs real color strings, so we read the CSS variables that
 // @theme in index.css defines.

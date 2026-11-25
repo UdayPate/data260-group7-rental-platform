@@ -46,7 +46,7 @@ function SignupPage() {
 
   return (
     <section className="mx-auto max-w-md space-y-6">
-      <h1 className="font-display text-4xl font-bold">Create an account</h1>
+      <h1 className="cornice font-display text-4xl font-bold">Create an account</h1>
 
       <form onSubmit={submit} className="space-y-4 rounded-2xl border border-line bg-surface p-6">
         <fieldset className="space-y-2">
@@ -58,7 +58,7 @@ function SignupPage() {
                 type="button"
                 aria-pressed={type === t}
                 onClick={() => setType(t)}
-                className={`flex-1 rounded-full px-4 py-1.5 font-semibold ${type === t ? 'bg-mustard text-bg' : 'text-fg-muted'}`}
+                className={`flex-1 rounded-full px-4 py-1.5 font-semibold ${type === t ? 'bg-gold text-bg' : 'text-fg-muted'}`}
               >
                 {t === 'guest' ? 'Book stays (guest)' : 'List my place (host)'}
               </button>

@@ -4,7 +4,7 @@
 //    search filters on the search page (D4a).
 //  - While the debate runs: agent chips + a "Now:" line; then a compact verdict with
 //    Approve / Reject and "Open full debate" (D7a). Edit lives on the full page.
-//  - A mustard dot on the button when the verdict is ready and the panel is closed (D8a).
+//  - A gold dot on the button when the verdict is ready and the panel is closed (D8a).
 // It is mounted once in the layout, so the current task survives page changes (D6a).
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
@@ -54,7 +54,7 @@ function AssistantLauncher() {
     pathname === '/signup'
   if (hidden) return null
 
-  const onSearchPage = pathname === '/'
+  const onSearchPage = pathname === '/search'
   const filterText = onSearchPage ? describeFiltersForAi(readFilters(searchParams), PROPERTY_TYPE_LABELS, AMENITY_LABELS) : ''
 
   function toggle() {
@@ -121,7 +121,7 @@ function AssistantLauncher() {
               autoFocus
               aria-label="What are you looking for?"
               placeholder="e.g. 2 nights in San Jose for 2, under $250, parking, kitchen, rating ≥ 4.5"
-              className="w-full rounded-2xl border border-line bg-surface-2 px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-mustard focus:outline-none"
+              className="w-full rounded-2xl border border-line bg-surface-2 px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-gold focus:outline-none"
             />
             {filterText && text !== filterText && (
               <button type="button" onClick={() => setText(filterText)} className="text-sm font-semibold text-primary hover:underline">
@@ -151,16 +151,16 @@ function AssistantLauncher() {
           aria-label={tooltip}
           aria-expanded={open}
           aria-controls="ai-assistant-panel"
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg hover:brightness-110 focus-visible:ring-2 focus-visible:ring-mustard focus-visible:outline-none"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg hover:brightness-110 focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none"
         >
           <SparkleIcon className="h-7 w-7" />
         </button>
         {verdictReady && !open && (
-          <span data-verdict-dot className="absolute top-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-bg bg-mustard" aria-hidden="true" />
+          <span data-verdict-dot className="absolute top-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-bg bg-gold" aria-hidden="true" />
         )}
         <span
           role="tooltip"
-          className="pointer-events-none absolute top-1/2 right-full mr-3 -translate-y-1/2 rounded-full bg-cream px-3 py-1 text-sm font-semibold whitespace-nowrap text-cream-ink opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+          className="pointer-events-none absolute top-1/2 right-full mr-3 -translate-y-1/2 rounded-full bg-travertine px-3 py-1 text-sm font-semibold whitespace-nowrap text-travertine-ink opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
         >
           {tooltip}
         </span>
@@ -245,7 +245,7 @@ function TaskProgress({ taskId, guestId, onVerdictReady, onStartOver }: Progress
     <div className="space-y-3 text-sm">
       <p className="line-clamp-2 text-fg-soft">“{task.request_text}”</p>
       <p className="flex flex-wrap items-center gap-x-2">
-        <span data-assistant-status={status} className="font-condensed font-bold tracking-[0.08em] text-mustard uppercase">
+        <span data-assistant-status={status} className="font-condensed font-bold tracking-[0.08em] text-gold uppercase">
           {TASK_STATUS_TEXT[status]}
         </span>
         <span className="font-mono text-xs text-fg-muted" title={task.trace_id}>
@@ -270,7 +270,7 @@ function TaskProgress({ taskId, guestId, onVerdictReady, onStartOver }: Progress
 
       {/* ---------- Compact verdict ---------- */}
       {result && (
-        <div data-assistant-verdict className="space-y-2 rounded-xl border-2 border-mustard bg-verdict p-3">
+        <div data-assistant-verdict className="space-y-2 rounded-xl border-2 border-gold bg-verdict p-3">
           {rec ? (
             <>
               <p className="font-condensed text-lg font-bold">{rec.title}</p>
@@ -336,7 +336,7 @@ function TaskProgress({ taskId, guestId, onVerdictReady, onStartOver }: Progress
                 onChange={(e) => setReason(e.target.value)}
                 aria-label="Why are you rejecting it?"
                 placeholder="Why are you rejecting it?"
-                className="w-full rounded-full border border-line bg-surface-2 px-3 py-1.5 text-fg placeholder:text-fg-muted focus:border-mustard focus:outline-none"
+                className="w-full rounded-full border border-line bg-surface-2 px-3 py-1.5 text-fg placeholder:text-fg-muted focus:border-gold focus:outline-none"
               />
               <div className="flex gap-2">
                 <button

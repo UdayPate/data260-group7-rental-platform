@@ -1,4 +1,4 @@
-// The cream filter strip under the header on the search page.
+// The travertine filter strip under the header on the search page.
 // Chips apply immediately by changing the URL; the search page reacts to the URL.
 // Price, Type and More open a small panel; it closes on a click outside or the Escape key.
 import { useRef, useState } from 'react'
@@ -20,7 +20,7 @@ type Panel = 'price' | 'type' | 'more' | null
 function PricePanel(props: { min: number | null; max: number | null; onApply: (min: number | null, max: number | null) => void }) {
   const [min, setMin] = useState(props.min === null ? '' : String(props.min))
   const [max, setMax] = useState(props.max === null ? '' : String(props.max))
-  const inputClass = 'w-24 rounded-full border border-cream-border px-3 py-1 text-sm'
+  const inputClass = 'w-24 rounded-full border border-travertine-border px-3 py-1 text-sm'
   return (
     <form
       onSubmit={(e) => {
@@ -29,7 +29,7 @@ function PricePanel(props: { min: number | null; max: number | null; onApply: (m
       }}
       className="flex flex-col gap-3"
     >
-      <p className="text-sm text-cream-ink-soft">Nightly price (USD)</p>
+      <p className="text-sm text-travertine-ink-soft">Nightly price (USD)</p>
       <div className="flex items-center gap-2">
         <input type="number" min={0} value={min} onChange={(e) => setMin(e.target.value)} placeholder="Min" aria-label="Minimum price" className={inputClass} />
         <span>–</span>
@@ -73,7 +73,7 @@ function FilterStrip() {
   }
 
   return (
-    <div className="bg-cream">
+    <div className="travertine-strip">
       <div ref={stripRef} className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-6 py-3">
         <div className="relative">
           <Chip active={filters.min_price !== null || filters.max_price !== null} expanded={openPanel === 'price'} onClick={() => togglePanel('price')}>
@@ -125,7 +125,7 @@ function FilterStrip() {
           Available only
         </Chip>
 
-        <span className="mx-1 h-6 w-px bg-cream-border" aria-hidden="true" />
+        <span className="mx-1 h-6 w-px bg-travertine-border" aria-hidden="true" />
 
         {QUICK_AMENITIES.map((amenity) => (
           <Chip
@@ -153,7 +153,7 @@ function FilterStrip() {
           )}
         </div>
 
-        <span className="mx-1 h-6 w-px bg-cream-border" aria-hidden="true" />
+        <span className="mx-1 h-6 w-px bg-travertine-border" aria-hidden="true" />
 
         {/* Clears the strip's filters; where / dates / guests from the search bar stay. */}
         <button
@@ -161,7 +161,7 @@ function FilterStrip() {
           onClick={() =>
             update({ min_price: null, max_price: null, types: [], amenities: [], min_rating: null, available_only: false })
           }
-          className="text-sm font-semibold text-cream-ink underline-offset-2 hover:underline"
+          className="text-sm font-semibold text-travertine-ink underline-offset-2 hover:underline"
         >
           Clear
         </button>

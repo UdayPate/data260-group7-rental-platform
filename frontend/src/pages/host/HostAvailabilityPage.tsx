@@ -33,7 +33,7 @@ function loadRange() {
 type Props = { propertyId: string; hostId: string }
 
 const inputClass =
-  'w-full rounded-full border border-line bg-surface-2 px-4 py-2 text-fg focus:border-mustard focus:outline-none [color-scheme:dark]'
+  'w-full rounded-full border border-line bg-surface-2 px-4 py-2 text-fg focus:border-gold focus:outline-none [color-scheme:dark]'
 const labelClass = 'font-condensed text-xs font-bold tracking-[0.08em] text-fg-muted uppercase'
 
 function HostAvailability({ propertyId, hostId }: Props) {
@@ -164,7 +164,7 @@ function HostAvailability({ propertyId, hostId }: Props) {
     <section className="space-y-6">
       {backLink}
       <div>
-        <h1 className="font-display text-3xl font-bold">Availability</h1>
+        <h1 className="cornice font-display text-3xl font-bold">Availability</h1>
         <p className="text-fg-soft">
           {property.title} · <span className="font-mono text-sm">{property.property_id}</span>
         </p>

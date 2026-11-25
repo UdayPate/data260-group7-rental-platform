@@ -63,7 +63,7 @@ function HostCharts({ data }: { data: HostDashboard }) {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-condensed text-3xl font-bold tracking-[0.06em] uppercase">Host dashboard</h1>
+      <h1 className="cornice font-display text-3xl font-bold">Host dashboard</h1>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile label={`Occupancy, next ${data.days} days`} value={`${Math.round(data.occupancy_rate * 100)}%`} sub="booked nights from today, across active listings" source={data.sources.bookings} />
         <KpiTile label="Average nightly price" value={formatPrice(data.average_nightly_price)} sub="across active listings" />

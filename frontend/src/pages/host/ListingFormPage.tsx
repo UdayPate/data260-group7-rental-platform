@@ -186,7 +186,7 @@ function ListingForm({ propertyId, hostId }: Props) {
   return (
     <section className="max-w-3xl space-y-6">
       {backLink}
-      <h1 className="font-display text-3xl font-bold">{isEdit ? 'Edit listing' : 'New listing'}</h1>
+      <h1 className="cornice font-display text-3xl font-bold">{isEdit ? 'Edit listing' : 'New listing'}</h1>
 
       <form onSubmit={submit} className="space-y-6">
         <Fieldset title="Basics">
@@ -264,7 +264,7 @@ function ListingForm({ propertyId, hostId }: Props) {
 
         <Fieldset title="Photo">
           <Field label="Photo URL (optional)" wide>
-            <input type="url" value={values.photo_url} onChange={(e) => set('photo_url', e.target.value)} placeholder="https://…" className={inputClass} />
+            <input type="text" value={values.photo_url} onChange={(e) => set('photo_url', e.target.value)} placeholder="https://… or /photos/p_001.jpg" className={inputClass} />
           </Field>
         </Fieldset>
 
@@ -290,10 +290,10 @@ function ListingForm({ propertyId, hostId }: Props) {
 // ---------- Small layout helpers for the form ----------
 
 const inputClass =
-  'w-full rounded-full border border-line bg-surface-2 px-4 py-2 text-fg placeholder:text-fg-muted focus:border-mustard focus:outline-none'
+  'w-full rounded-full border border-line bg-surface-2 px-4 py-2 text-fg placeholder:text-fg-muted focus:border-gold focus:outline-none'
 // Multi-line boxes use a normal rounded corner; a full pill shape looks odd on a tall box.
 const textareaClass =
-  'w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg placeholder:text-fg-muted focus:border-mustard focus:outline-none'
+  'w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg placeholder:text-fg-muted focus:border-gold focus:outline-none'
 
 function Fieldset({ title, children }: { title: string; children: ReactNode }) {
   return (

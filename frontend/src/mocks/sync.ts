@@ -51,7 +51,7 @@ type Message =
   | { type: 'task'; entry: TaskEntry }
 
 const windowId = typeof crypto !== 'undefined' ? crypto.randomUUID() : 'node'
-const channel = typeof window === 'undefined' ? null : new BroadcastChannel('cedar-rye-mock-sync')
+const channel = typeof window === 'undefined' ? null : new BroadcastChannel('xenia-mock-sync')
 
 // What this window last shared (or received), as JSON per record, to find what changed.
 const lastSeen = new Map<string, Map<string, string>>()

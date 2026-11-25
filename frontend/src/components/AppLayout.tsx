@@ -9,14 +9,23 @@ import Header from './Header'
 // survives moving between pages. It hides itself where it doesn't belong.
 function AppLayout() {
   const { user } = useAuth()
+  const { pathname } = useLocation()
 
   return (
     <>
       <Header />
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <WrongRoleNote />
-        <Outlet />
-      </main>
+      {/* The logged-out home page is full width (its hero photo spans the screen);
+          every other page sits in the usual centred column. */}
+      {pathname === '/' && !user ? (
+        <main>
+          <Outlet />
+        </main>
+      ) : (
+        <main className="mx-auto max-w-7xl px-6 py-8">
+          <WrongRoleNote />
+          <Outlet />
+        </main>
+      )}
       {/* key: a different account in this tab starts a fresh assistant (no one else's request) */}
       <AssistantLauncher key={user?.id ?? 'logged-out'} />
     </>

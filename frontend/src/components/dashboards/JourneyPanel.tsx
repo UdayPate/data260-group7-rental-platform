@@ -60,7 +60,7 @@ function JourneyPanel({ traceId }: { traceId: string }) {
 
   const start = Date.parse(trace.started)
   return (
-    <section data-journey className="space-y-3 rounded-2xl border border-mustard bg-surface p-4">
+    <section data-journey className="space-y-3 rounded-2xl border border-gold bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-condensed text-lg font-bold tracking-[0.06em] uppercase">Journey · {trace.title}</h2>

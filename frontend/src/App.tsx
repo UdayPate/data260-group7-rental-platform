@@ -1,17 +1,13 @@
+import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router'
 import RequireRole from './auth/RequireRole'
 import AppLayout from './components/AppLayout'
+import HomeRoute from './pages/HomeRoute'
 import NotFoundPage from './pages/NotFoundPage'
-import ThemeCheckPage from './pages/ThemeCheckPage'
 import AiDebatePage from './pages/ai/AiDebatePage'
 import LoginPage from './pages/auth/LoginPage'
 import SignupPage from './pages/auth/SignupPage'
 import AiRequestPage from './pages/ai/AiRequestPage'
-import AiDashboardPage from './pages/dashboards/AiDashboardPage'
-import DashboardsLayout from './pages/dashboards/DashboardsLayout'
-import GuestDashboardPage from './pages/dashboards/GuestDashboardPage'
-import HostDashboardPage from './pages/dashboards/HostDashboardPage'
-import PlatformDashboardPage from './pages/dashboards/PlatformDashboardPage'
 import GuestMessagesPage from './pages/guest/GuestMessagesPage'
 import GuestProfilePage from './pages/guest/GuestProfilePage'
 import PropertyDetailsPage from './pages/guest/PropertyDetailsPage'
@@ -26,6 +22,17 @@ import HostReservationsPage from './pages/host/HostReservationsPage'
 import HostReviewsPage from './pages/host/HostReviewsPage'
 import ListingFormPage from './pages/host/ListingFormPage'
 
+// The dashboards (and Recharts, which only they use) are loaded on demand: the browser
+// downloads that code the first time someone opens a dashboard, which keeps the
+// first page load small. <Suspense> shows "Loading…" while it downloads.
+const DashboardsLayout = lazy(() => import('./pages/dashboards/DashboardsLayout'))
+const GuestDashboardPage = lazy(() => import('./pages/dashboards/GuestDashboardPage'))
+const HostDashboardPage = lazy(() => import('./pages/dashboards/HostDashboardPage'))
+const PlatformDashboardPage = lazy(() => import('./pages/dashboards/PlatformDashboardPage'))
+const AiDashboardPage = lazy(() => import('./pages/dashboards/AiDashboardPage'))
+
+const loading = <p className="text-fg-muted">Loading…</p>
+
 // Every URL in the app. All pages render inside AppLayout (header + page).
 // ":propertyId" etc. are URL parameters the page reads with useParams().
 function App() {
@@ -33,7 +40,9 @@ function App() {
     <Routes>
       <Route element={<AppLayout />}>
         {/* Public: anyone, logged in or not */}
-        <Route path="/" element={<SearchPage />} />
+        {/* "/" = the home page when logged out; logged-in users go on to /search. */}
+        <Route path="/" element={<HomeRoute />} />
+        <Route path="/search" element={<SearchPage />} />
         <Route path="/properties/:propertyId" element={<PropertyDetailsPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
@@ -61,21 +70,18 @@ function App() {
         </Route>
 
         {/* Dashboards share a tab row; each one is for one role */}
-        <Route element={<DashboardsLayout />}>
+        <Route element={<Suspense fallback={loading}><DashboardsLayout /></Suspense>}>
           <Route element={<RequireRole role="guest" />}>
-            <Route path="/dashboards/guest" element={<GuestDashboardPage />} />
+            <Route path="/dashboards/guest" element={<Suspense fallback={loading}><GuestDashboardPage /></Suspense>} />
           </Route>
           <Route element={<RequireRole role="host" />}>
-            <Route path="/dashboards/host" element={<HostDashboardPage />} />
+            <Route path="/dashboards/host" element={<Suspense fallback={loading}><HostDashboardPage /></Suspense>} />
           </Route>
           <Route element={<RequireRole role="admin" />}>
-            <Route path="/dashboards/platform" element={<PlatformDashboardPage />} />
-            <Route path="/dashboards/ai" element={<AiDashboardPage />} />
+            <Route path="/dashboards/platform" element={<Suspense fallback={loading}><PlatformDashboardPage /></Suspense>} />
+            <Route path="/dashboards/ai" element={<Suspense fallback={loading}><AiDashboardPage /></Suspense>} />
           </Route>
         </Route>
-
-        {/* Developer-only theme check (remove once the theme is settled) */}
-        <Route path="/theme-check" element={<ThemeCheckPage />} />
 
         {/* Any other URL */}
         <Route path="*" element={<NotFoundPage />} />

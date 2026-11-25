@@ -68,7 +68,7 @@ function HostReviews({ hostId, onReload }: { hostId: string; onReload: () => voi
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-condensed text-3xl font-bold tracking-[0.06em] uppercase">Reviews</h1>
+        <h1 className="cornice font-display text-3xl font-bold">Reviews</h1>
         <div className="flex items-center gap-3">
           <select
             value={listingFilter}
@@ -101,7 +101,7 @@ function HostReviews({ hostId, onReload }: { hostId: string; onReload: () => voi
             aria-selected={tab === t.id}
             onClick={() => setParam('tab', t.id === 'all' ? 'all' : '')}
             className={`rounded-full border px-4 py-1.5 font-semibold ${
-              tab === t.id ? 'border-mustard-border bg-mustard text-bg' : 'border-line text-fg-muted hover:text-fg'
+              tab === t.id ? 'border-gold-border bg-gold text-bg' : 'border-line text-fg-muted hover:text-fg'
             }`}
           >
             {loading ? t.label.replace(/ \(\d+\)/, '') : t.label}
@@ -159,8 +159,8 @@ function HostReviewCard({ review, hostId, guestName, listingTitle, onReplied }: 
       <p className="text-fg-soft">“{review.review_text}”</p>
 
       {review.response_text !== null ? (
-        <div className="rounded-xl border-l-4 border-mustard bg-surface-2 p-3 text-sm">
-          <p className="font-semibold text-mustard">Your reply</p>
+        <div className="rounded-xl border-l-4 border-gold bg-surface-2 p-3 text-sm">
+          <p className="font-semibold text-gold">Your reply</p>
           <p className="text-fg-soft">{review.response_text}</p>
         </div>
       ) : (
@@ -172,7 +172,7 @@ function HostReviewCard({ review, hostId, guestName, listingTitle, onReplied }: 
               onChange={(e) => setReply(e.target.value)}
               rows={2}
               maxLength={RESPONSE_TEXT_MAX}
-              className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg focus:border-mustard focus:outline-none"
+              className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg focus:border-gold focus:outline-none"
             />
           </label>
           <div className="flex items-center justify-between gap-3">

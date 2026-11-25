@@ -16,7 +16,7 @@ import type { GuestDashboard } from '../../types/analytics'
 const STATUS_TOKEN: Record<string, string> = {
   pending: 'status-pending',
   approved: 'status-ok',
-  completed: 'teal',
+  completed: 'olive',
   declined: 'status-error',
   cancelled: 'status-error',
 }
@@ -71,7 +71,7 @@ function GuestCharts({ data }: { data: GuestDashboard }) {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-condensed text-3xl font-bold tracking-[0.06em] uppercase">Guest dashboard</h1>
+      <h1 className="cornice font-display text-3xl font-bold">Guest dashboard</h1>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile label={`Bookings, last ${data.days} days`} value={String(totalBookings)} source={data.sources.bookings} />
         <KpiTile label={`Saves, last ${data.days} days`} value={String(totalSaves)} source={data.sources.saved} />
@@ -120,7 +120,7 @@ function GuestCharts({ data }: { data: GuestDashboard }) {
               <Tooltip {...tooltipProps()} />
               <Bar dataKey="count" name="Reservations" radius={BAR_RADIUS_RIGHT} maxBarSize={22}>
                 {data.status_summary.map((s) => (
-                  <Cell key={s.status} fill={themeColor(STATUS_TOKEN[s.status] ?? 'teal')} />
+                  <Cell key={s.status} fill={themeColor(STATUS_TOKEN[s.status] ?? 'olive')} />
                 ))}
               </Bar>
             </BarChart>

@@ -22,7 +22,7 @@ export function useAuth(): Auth {
 
 // Where each role starts, and where a wrong-role page sends you.
 export const HOME: Record<Role, string> = {
-  guest: '/',
+  guest: '/search',
   host: '/host/listings',
   admin: '/dashboards/platform',
 }

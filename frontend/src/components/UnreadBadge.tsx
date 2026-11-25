@@ -44,7 +44,7 @@ function UnreadBadge({ userId }: { userId: string }) {
   }
   if (count === 0) return null
   return (
-    <span data-unread-badge aria-label={`${count} unread`} className="ml-1.5 rounded-full bg-mustard px-1.5 py-0.5 text-xs font-bold text-bg">
+    <span data-unread-badge aria-label={`${count} unread`} className="ml-1.5 rounded-full bg-gold px-1.5 py-0.5 text-xs font-bold text-bg">
       {count}
     </span>
   )

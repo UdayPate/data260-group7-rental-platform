@@ -1,4 +1,4 @@
-// Host "My listings": the current host's listings as rows (U1a), filtered by the cream
+// Host "My listings": the current host's listings as rows (U1a), filtered by the travertine
 // strip (URL), with View / Edit / Availability / Delete actions and a "New listing" button.
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
@@ -96,7 +96,7 @@ function HostListings({ paramsString, hostId }: Props) {
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-condensed text-3xl font-bold tracking-[0.06em] uppercase">
+        <h1 className="cornice font-display text-3xl font-bold">
           My listings {!loading && !error && <span className="text-fg-muted">({listings.length})</span>}
         </h1>
         <Link to="/host/listings/new" className="rounded-full bg-primary px-5 py-2 font-semibold text-on-primary hover:brightness-110">
@@ -191,7 +191,7 @@ function ListingRow({ listing, confirming, deleting, deleteError, onAskDelete, o
         </td>
         <td className="px-4 py-3">
           <span className="flex items-center gap-1 text-sm">
-            <StarIcon className="h-4 w-4 text-mustard" />
+            <StarIcon className="h-4 w-4 text-gold" />
             {listing.review_count > 0 ? `${listing.rating.toFixed(2)} (${listing.review_count})` : 'New'}
           </span>
         </td>

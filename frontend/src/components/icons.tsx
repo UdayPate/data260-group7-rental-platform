@@ -80,3 +80,15 @@ export function HouseIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+// The Xenia mark: a small classical arch (two columns and a round top) on a base line.
+// Same drawing as public/favicon.svg.
+export function ArchMark({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+      <path d="M6 20V11a6 6 0 0 1 12 0v9" />
+      <path d="M3.5 20.5h17" />
+      <path d="M9.5 20v-8a2.5 2.5 0 0 1 5 0v8" />
+    </svg>
+  )
+}

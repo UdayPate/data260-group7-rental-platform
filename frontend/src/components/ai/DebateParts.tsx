@@ -75,7 +75,7 @@ export function PlanPanel({ plan }: { plan: Plan | null }) {
             <div className="flex gap-2">
               <span
                 aria-hidden="true"
-                className={s.status === 'done' ? 'text-status-ok' : s.status === 'in_progress' ? 'text-mustard' : s.status === 'failed' ? 'text-status-error' : 'text-fg-muted'}
+                className={s.status === 'done' ? 'text-status-ok' : s.status === 'in_progress' ? 'text-gold' : s.status === 'failed' ? 'text-status-error' : 'text-fg-muted'}
               >
                 {STEP_MARK[s.status]}
               </span>
@@ -155,14 +155,14 @@ export function RejectedOutputCard({ item }: { item: DebateView['rejectedOutputs
 
 // ---------- Rounds 1 and 2 ----------
 
-// Round 1: the chair's challenge, on a cream card (CLAUDE.md).
+// Round 1: the chair's challenge, on a travertine card (CLAUDE.md).
 export function ChallengeCard({ challenge, titleOf }: { challenge: Challenge; titleOf: (id: string) => string }) {
   return (
-    <div data-challenge={challenge.challenge_id} className="rounded-2xl border border-cream-border bg-cream p-4 text-cream-ink">
+    <div data-challenge={challenge.challenge_id} className="rounded-2xl border border-travertine-border bg-travertine p-4 text-travertine-ink">
       <p className="font-condensed text-sm font-bold tracking-[0.08em] uppercase">
         Chair → <span>{AGENT_LABELS[challenge.to_agent]}</span>
-        {challenge.about_property_id && <span className="text-cream-ink-soft"> · about {titleOf(challenge.about_property_id)}</span>}
-        <span className="font-mono text-cream-ink-soft"> · {challenge.challenge_id}</span>
+        {challenge.about_property_id && <span className="text-travertine-ink-soft"> · about {titleOf(challenge.about_property_id)}</span>}
+        <span className="font-mono text-travertine-ink-soft"> · {challenge.challenge_id}</span>
       </p>
       <p className="mt-1">{challenge.question}</p>
     </div>

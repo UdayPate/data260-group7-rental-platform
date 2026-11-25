@@ -1,4 +1,4 @@
-// A reservation status as a colored outline pill: pending (mustard), approved (green),
+// A reservation status as a colored outline pill: pending (gold), approved (green),
 // declined / cancelled (red), completed (muted).
 import type { ReservationStatus } from '../types/reservation'
 

@@ -1,4 +1,4 @@
-// The cream strip on the host's "My listings" page: city/address search, Type ▾,
+// The travertine strip on the host's "My listings" page: city/address search, Type ▾,
 // Active / Inactive, Clear. Like the guest strip, it only changes the URL;
 // the listings page reads the URL and asks /properties/search (with host_id).
 import { useRef, useState, type FormEvent } from 'react'
@@ -31,18 +31,18 @@ function HostFilterStrip() {
   const toggleStatus = (status: PropertyStatus) => update({ status: filters.status === status ? null : status })
 
   return (
-    <div className="bg-cream">
+    <div className="travertine-strip">
       <div ref={stripRef} className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-6 py-3">
-        <form onSubmit={submitLocation} role="search" className="flex items-center rounded-full border border-cream-border bg-white pr-1 pl-3.5">
+        <form onSubmit={submitLocation} role="search" className="flex items-center rounded-full border border-travertine-border bg-white pr-1 pl-3.5">
           <input
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="City or address"
             aria-label="Filter my listings by city or address"
-            className="w-44 bg-transparent py-1.5 text-sm text-cream-ink placeholder:text-cream-ink-soft focus:outline-none"
+            className="w-44 bg-transparent py-1.5 text-sm text-travertine-ink placeholder:text-travertine-ink-soft focus:outline-none"
           />
-          <button type="submit" aria-label="Apply" className="rounded-full p-1.5 text-cream-ink hover:bg-cream">
+          <button type="submit" aria-label="Apply" className="rounded-full p-1.5 text-travertine-ink hover:bg-travertine">
             <SearchIcon className="h-4 w-4" />
           </button>
         </form>
@@ -63,7 +63,7 @@ function HostFilterStrip() {
           )}
         </div>
 
-        <span className="mx-1 h-6 w-px bg-cream-border" aria-hidden="true" />
+        <span className="mx-1 h-6 w-px bg-travertine-border" aria-hidden="true" />
 
         <Chip active={filters.status === 'active'} onClick={() => toggleStatus('active')}>
           Active
@@ -72,7 +72,7 @@ function HostFilterStrip() {
           Inactive
         </Chip>
 
-        <span className="mx-1 h-6 w-px bg-cream-border" aria-hidden="true" />
+        <span className="mx-1 h-6 w-px bg-travertine-border" aria-hidden="true" />
 
         <button
           type="button"
@@ -80,7 +80,7 @@ function HostFilterStrip() {
             setLocation('')
             setSearchParams(new URLSearchParams())
           }}
-          className="text-sm font-semibold text-cream-ink underline-offset-2 hover:underline"
+          className="text-sm font-semibold text-travertine-ink underline-offset-2 hover:underline"
         >
           Clear
         </button>

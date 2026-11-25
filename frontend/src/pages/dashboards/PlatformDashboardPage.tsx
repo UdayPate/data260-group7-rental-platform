@@ -56,12 +56,13 @@ const ms = (n: number) => (n < 1000 ? `${n} ms` : `${(n / 1000).toFixed(1)} s`)
 function PlatformCharts({ data }: { data: PlatformDashboard }) {
   const ai = data.workflow_latency.find((w) => w.workflow.startsWith('AI'))
   const booking = data.workflow_latency.find((w) => w.workflow === 'Booking request → stored')
+  const fastWorkflows = data.workflow_latency.filter((w) => w !== ai) // the chart's rows (AI has its own tile)
   // Bars per topic: one row each, so the chart grows with the number of topics.
   const topicHeight = Math.max(200, data.events_by_topic.length * 26 + 40)
 
   return (
     <div className="space-y-6">
-      <h1 className="font-condensed text-3xl font-bold tracking-[0.06em] uppercase">Platform dashboard</h1>
+      <h1 className="cornice font-display text-3xl font-bold">Platform dashboard</h1>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile label="Dead-letter messages" value={String(data.dead_letters.length)} sub={`last ${data.days} days`} source={data.sources.dead_letters} />
         <KpiTile label="Rejected envelopes" value={String(data.rejected_envelopes)} sub="failed validation at /events/ingest" source={{ kind: 'computed', note: 'Counted by the ingest endpoint' }} />
@@ -148,22 +149,24 @@ function PlatformCharts({ data }: { data: PlatformDashboard }) {
           source={data.sources.latency}
           table={{ columns: ['Workflow', 'Average (ms)', 'p95 (ms)'], rows: data.workflow_latency.map((w) => [w.workflow, w.avg_ms, w.p95_ms]) }}
         >
-          <ResponsiveContainer>
-            {/* Seconds on one shared axis (no second axis), so AI and booking times compare honestly */}
-            <BarChart
-              data={data.workflow_latency.map((w) => ({ ...w, avg_s: w.avg_ms / 1000, p95_s: w.p95_ms / 1000 }))}
-              layout="vertical"
-              margin={{ top: 4, right: 16, left: 24, bottom: 0 }}
-            >
+          <ResponsiveContainer height="88%">
+            {/* The AI debate takes ~25 s and would squash every other bar to a sliver, so it is
+                left out of the chart (it has its own tile above; the table view keeps every row). */}
+            <BarChart data={fastWorkflows} layout="vertical" margin={{ top: 4, right: 16, left: 24, bottom: 0 }}>
               <CartesianGrid {...gridProps()} horizontal={false} vertical />
-              <XAxis type="number" unit=" s" {...axisProps()} />
+              <XAxis type="number" unit=" ms" {...axisProps()} />
               <YAxis type="category" dataKey="workflow" width={170} interval={0} {...axisProps()} />
-              <Tooltip {...tooltipProps()} formatter={(v) => `${Number(v).toFixed(2)} s`} />
+              <Tooltip {...tooltipProps()} formatter={(v) => `${Number(v).toLocaleString()} ms`} />
               <Legend {...legendProps()} />
-              <Bar dataKey="avg_s" name="Average" fill={seriesColor(0)} radius={BAR_RADIUS_RIGHT} maxBarSize={14} />
-              <Bar dataKey="p95_s" name="p95" fill={seriesColor(2)} radius={BAR_RADIUS_RIGHT} maxBarSize={14} />
+              <Bar dataKey="avg_ms" name="Average" fill={seriesColor(0)} radius={BAR_RADIUS_RIGHT} maxBarSize={14} />
+              <Bar dataKey="p95_ms" name="p95" fill={seriesColor(1)} radius={BAR_RADIUS_RIGHT} maxBarSize={14} />
             </BarChart>
           </ResponsiveContainer>
+          {ai && (
+            <p data-latency-note className="text-xs text-fg-muted">
+              AI request → verdict ({ms(ai.avg_ms)} average) is not drawn here; see its tile above.
+            </p>
+          )}
         </ChartCard>
 
         <section data-dead-letters className="space-y-3 rounded-2xl border border-line bg-surface p-4 lg:col-span-2">

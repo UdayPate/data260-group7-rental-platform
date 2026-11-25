@@ -17,7 +17,8 @@ import PropertyReviews from '../../components/PropertyReviews'
 import BookingPanel from '../../components/BookingPanel'
 import ErrorBanner from '../../components/ErrorBanner'
 import { LiveStatusPill, LiveUpdatesLog } from '../../components/LiveUpdates'
-import { HeartIcon, HouseIcon, StarIcon } from '../../components/icons'
+import { HeartIcon, StarIcon } from '../../components/icons'
+import PropertyPhoto from '../../components/PropertyPhoto'
 import { useCurrentUser } from '../../context/useCurrentUser'
 import { dateString, localDate } from '../../dates'
 import { AMENITY_LABELS, formatPrice, PROPERTY_TYPE_LABELS, plural } from '../../labels'
@@ -157,7 +158,7 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
     if (value) backParams.set(key, value)
   }
   const backLink = (
-    <Link to={`/?${backParams.toString()}`} className="text-sm font-semibold text-fg-muted hover:text-fg">
+    <Link to={`/search?${backParams.toString()}`} className="text-sm font-semibold text-fg-muted hover:text-fg">
       ← Back to search
     </Link>
   )
@@ -214,18 +215,11 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
       <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
         {/* ---------- Left column ---------- */}
         <div className="space-y-8">
-          {property.photo_url ? (
-            <img src={property.photo_url} alt="" className="h-[340px] w-full rounded-2xl object-cover" />
-          ) : (
-            <div className="flex h-[340px] flex-col items-center justify-center gap-3 rounded-2xl border border-line bg-surface-2 text-fg-muted">
-              <HouseIcon className="h-20 w-20" />
-              <span className="font-condensed font-bold tracking-[0.08em] uppercase">{typeLabel}</span>
-            </div>
-          )}
+          <PropertyPhoto photoUrl={property.photo_url} typeLabel={typeLabel} className="h-[380px]" large />
 
           <div className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <h1 className="font-display text-4xl font-bold">{property.title}</h1>
+              <h1 className="cornice font-display text-4xl font-bold">{property.title}</h1>
               {isGuest && (
                 <button
                   type="button"
@@ -245,7 +239,7 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
               )}
             </div>
             <p className="flex flex-wrap items-center gap-x-2 text-fg-soft">
-              <StarIcon className="h-4 w-4 text-mustard" />
+              <StarIcon className="h-4 w-4 text-gold" />
               {property.review_count > 0 ? (
                 <span>
                   {property.rating.toFixed(2)} · {plural(property.review_count, 'review')}
@@ -274,7 +268,7 @@ function PropertyDetails({ propertyId, guestId }: DetailsProps) {
               </p>
             </div>
             {host.access_level === 'superhost' && (
-              <span className="rounded-full bg-mustard px-3 py-1 text-xs font-bold text-bg">Superhost</span>
+              <span className="rounded-full bg-gold px-3 py-1 text-xs font-bold text-bg">Superhost</span>
             )}
             <p className="text-sm text-fg-soft sm:ml-auto">
               Replies to {host.response_rate}% of messages, in {formatResponseTime(host.response_time)}

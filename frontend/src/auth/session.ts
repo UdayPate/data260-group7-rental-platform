@@ -8,7 +8,7 @@
 // the claims inside, to know who is logged in and when the token expires.
 import type { AuthUser, TokenClaims } from '../types/auth'
 
-const TOKEN_KEY = 'cedar-rye.token'
+const TOKEN_KEY = 'xenia.token'
 
 // The middle part of "header.payload.signature" is base64url-encoded JSON.
 function readClaims(token: string): TokenClaims | null {
@@ -51,7 +51,7 @@ export function clearToken() {
 
 // A service answered 401 (or a WebSocket closed with 4401): the token is missing, invalid
 // or expired. The AuthProvider listens for this event and sends the user to the login page.
-export const SESSION_ENDED_EVENT = 'cedar-rye:session-ended'
+export const SESSION_ENDED_EVENT = 'xenia:session-ended'
 
 export function endSession() {
   clearToken()

@@ -79,8 +79,12 @@ function AiDebate({ taskId }: { taskId: string }) {
       {/* ---------- Header ---------- */}
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-4xl font-bold">The Debate</h1>
-          <span data-task-status={status} className="rounded-full border border-mustard px-3 py-0.5 font-condensed text-sm font-bold tracking-[0.08em] text-mustard uppercase">
+          <h1 className="cornice font-display text-4xl font-bold">
+            The Forum
+            {/* The spec calls this view "the debate", so the subtitle keeps that word visible. */}
+            <span data-subtitle className="mt-1 block font-sans text-lg font-semibold tracking-normal text-fg-muted">the agents’ debate</span>
+          </h1>
+          <span data-task-status={status} className="rounded-full border border-gold px-3 py-0.5 font-condensed text-sm font-bold tracking-[0.08em] text-gold uppercase">
             {TASK_STATUS_TEXT[status]}
           </span>
           <span className={`flex items-center gap-1.5 text-sm ${streamStatus === 'open' ? 'text-status-ok' : 'text-fg-muted'}`}>

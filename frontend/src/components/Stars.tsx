@@ -6,7 +6,7 @@ export function StarRating({ value, size = 'h-4 w-4' }: { value: number; size?: 
   return (
     <span className="inline-flex items-center gap-0.5" role="img" aria-label={`${value} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <StarIcon key={n} className={`${size} ${n <= value ? 'text-mustard' : 'text-line-strong'}`} />
+        <StarIcon key={n} className={`${size} ${n <= value ? 'text-gold' : 'text-line-strong'}`} />
       ))}
     </span>
   )
@@ -28,9 +28,9 @@ export function StarPicker({ value, onChange }: { value: number; onChange: (n: n
             aria-checked={value === n}
             aria-label={`${n} star${n > 1 ? 's' : ''}, ${WORDS[n]}`}
             onClick={() => onChange(n)}
-            className="rounded-full p-1 focus-visible:ring-2 focus-visible:ring-mustard focus-visible:outline-none"
+            className="rounded-full p-1 focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none"
           >
-            <StarIcon className={`h-8 w-8 ${n <= value ? 'text-mustard' : 'text-line-strong hover:text-mustard-border'}`} />
+            <StarIcon className={`h-8 w-8 ${n <= value ? 'text-gold' : 'text-line-strong hover:text-gold-border'}`} />
           </button>
         ))}
       </div>

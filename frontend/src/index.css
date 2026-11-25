@@ -2,7 +2,9 @@
 @import "tailwindcss";
 
 /*
-  Cedar & Rye theme tokens.
+  Xenia theme tokens: "a modern accommodation marketplace inside a Roman villa".
+  Dark warm interface; colors taken from the hero photo (terracotta pots, antique gold,
+  bronze fittings, olive trees, travertine stone).
   Each --color-NAME becomes classes like bg-NAME, text-NAME, border-NAME
   (e.g. --color-surface -> bg-surface). Each --font-NAME becomes font-NAME.
   Pages must use these classes, never raw hex values.
@@ -19,26 +21,27 @@
   --color-surface-2: #2a2521;
   --color-line: #3d3630;
   --color-line-strong: #5a5046;
+  --color-bronze: #8a6a45; /* thin decorative lines: cornice rule, photo frames */
 
   /* Text on dark backgrounds (never go darker than fg-muted) */
   --color-fg: #f3ece0;
   --color-fg-soft: #e2d9cb;
   --color-fg-muted: #c9bdab;
 
-  /* Cream "strip" surface and what sits on it */
-  --color-cream: #f1eadc;
-  --color-cream-ink: #2a2521;
-  --color-cream-ink-soft: #6b5d4d;
-  --color-cream-border: #d8cdb9;
+  /* Travertine: the pale stone "strip" surface (filter bar, chair challenge cards, light callouts) */
+  --color-travertine: #e8ddc8;
+  --color-travertine-ink: #2a2521;
+  --color-travertine-ink-soft: #6b5d4d;
+  --color-travertine-border: #d2c3a6;
   --color-white: #ffffff;
 
   /* Accents */
-  --color-primary: #e8673a;
+  --color-primary: #e8673a; /* terracotta: main actions */
   --color-on-primary: #161311;
-  --color-mustard: #e3b04b;
-  --color-mustard-border: #c9952f;
+  --color-gold: #d9b565; /* antique gold: active chips, ratings, badges, verdict outline */
+  --color-gold-border: #a98a4c;
   --color-verdict: #2a2418;
-  --color-teal: #3f8f8a;
+  --color-olive: #6f8f3a; /* secondary: charts, info states, success surfaces */
 
   /* Price pill */
   --color-pill: #2f2a25;
@@ -46,7 +49,7 @@
 
   /* Status */
   --color-status-ok: #8fd19e;
-  --color-status-pending: #e3b04b;
+  --color-status-pending: #d9b565;
   --color-status-error: #f19a8a;
   --color-status-error-border: #7a3a36;
 
@@ -56,18 +59,20 @@
   --color-agent-fairness: #c9a8f0;
   --color-agent-chair: #f3ece0;
   --color-agent-parser: #8fd19e;
-  --color-agent-explanation: #e3b04b;
+  --color-agent-explanation: #d9b565;
 
-  /* Chart palette, use in this order */
+  /* Chart palette, use in this order (charts use at most the first 4).
+     Olive is 3rd, not 2nd: next to terracotta it is hard to tell apart for red-green
+     color-blind readers; this order passes the color-blind and contrast checks. */
   --color-chart-1: #e8673a;
-  --color-chart-2: #3f8f8a;
-  --color-chart-3: #e3b04b;
-  --color-chart-4: #7cc8e8;
+  --color-chart-2: #7cc8e8;
+  --color-chart-3: #6f8f3a;
+  --color-chart-4: #d9b565;
   --color-chart-5: #c9a8f0;
   --color-chart-6: #8fd19e;
 
   /* Fonts (loaded from Google Fonts in index.html) */
-  --font-display: "Fraunces", Georgia, serif; /* logo + a few big headings */
+  --font-display: "Cinzel", Georgia, serif; /* XENIA logo, page titles, big headings */
   --font-condensed: "Barlow Condensed", "Arial Narrow", sans-serif; /* titles, prices, KPIs, labels */
   --font-sans: "Barlow", system-ui, sans-serif; /* default body + UI text */
   --font-mono: "DM Mono", ui-monospace, monospace; /* IDs, timestamps, numeric columns */
@@ -78,5 +83,39 @@
   body {
     background-color: var(--color-bg);
     color: var(--color-fg);
+  }
+}
+
+/* Reusable villa details (plain CSS classes, no image files). */
+@layer components {
+  /* Travertine stone: pale warm color with faint horizontal banding, drawn with a
+     repeating gradient (thin slightly darker bands every 14px). */
+  .travertine-strip {
+    background-color: var(--color-travertine);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0 9px,
+      rgb(150 120 80 / 0.07) 9px 11px,
+      transparent 11px 14px
+    );
+  }
+
+  /* Arch-topped photo: the top corners are rounded into a shallow elliptical arch
+     (50% of the width, 35% of the height) with a thin bronze frame. */
+  .arch-photo {
+    border: 1px solid var(--color-bronze);
+    border-radius: 50% 50% 12px 12px / 35% 35% 12px 12px;
+    overflow: hidden;
+  }
+
+  /* Classical "cornice" under big page headings: two thin bronze lines. */
+  .cornice::after {
+    content: "";
+    display: block;
+    width: 7rem;
+    height: 4px;
+    margin-top: 0.6rem;
+    border-top: 1px solid var(--color-bronze);
+    border-bottom: 1px solid var(--color-bronze);
   }
 }

@@ -124,7 +124,7 @@ function WriteReview({ reservationId, guestId }: { reservationId: string; guestI
     <section className="max-w-2xl space-y-6">
       {backLink}
       <div>
-        <h1 className="font-display text-3xl font-bold">Review your stay</h1>
+        <h1 className="cornice font-display text-3xl font-bold">Review your stay</h1>
         <p className="text-fg-soft">
           {property.title} · {formatDate(reservation.check_in)} → {formatDate(reservation.check_out)}
         </p>
@@ -141,7 +141,7 @@ function WriteReview({ reservationId, guestId }: { reservationId: string; guestI
             rows={6}
             maxLength={REVIEW_TEXT_MAX}
             placeholder="What was great? What could be better?"
-            className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-3 text-fg placeholder:text-fg-muted focus:border-mustard focus:outline-none"
+            className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-3 text-fg placeholder:text-fg-muted focus:border-gold focus:outline-none"
           />
           <span data-char-count className={`block text-right text-xs ${length > 0 && !lengthOk ? 'text-status-pending' : 'text-fg-muted'}`}>
             {length} / {REVIEW_TEXT_MAX}

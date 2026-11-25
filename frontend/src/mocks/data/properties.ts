@@ -9,7 +9,8 @@ import { daysAgoDatetime } from '../dates'
 //   Risk trap:    p_002 is the cheapest match, but its host (h_003) is slow to reply and
 //                 cancelled two stays (see reservations.ts) - the Risk agent should flag it.
 //
-// photo_url is empty for now: the card shows a plain tile until we add real photos.
+// photo_url points at a resized photo in public/photos/ (served by Vite at /photos/...).
+// If a photo is missing or fails to load, the card falls back to the plain house tile.
 export const seedProperties: Property[] = [
   // ---------- San Jose ----------
   {
@@ -20,7 +21,7 @@ export const seedProperties: Property[] = [
     address: '1142 Lincoln Ave', city: 'San Jose', state: 'CA', zip_code: '95125', latitude: 37.3049, longitude: -121.8987,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'dryer', 'heating', 'air_conditioning'],
     nightly_price: 189, cleaning_fee: 65, rating: 4.86, review_count: 42,
-    created_datetime: daysAgoDatetime(610), photo_url: '',
+    created_datetime: daysAgoDatetime(610), photo_url: '/photos/p_001.jpg',
   },
   {
     property_id: 'p_002', host_id: 'h_003', status: 'active',
@@ -30,7 +31,7 @@ export const seedProperties: Property[] = [
     address: '455 S 10th St', city: 'San Jose', state: 'CA', zip_code: '95112', latitude: 37.3352, longitude: -121.8811,
     amenities: ['wifi', 'kitchen', 'parking', 'heating'],
     nightly_price: 139, cleaning_fee: 40, rating: 4.6, review_count: 18,
-    created_datetime: daysAgoDatetime(280), photo_url: '',
+    created_datetime: daysAgoDatetime(280), photo_url: '/photos/p_002.jpg',
   },
   {
     property_id: 'p_003', host_id: 'h_002', status: 'active',
@@ -40,7 +41,7 @@ export const seedProperties: Property[] = [
     address: '1389 Dana Ave', city: 'San Jose', state: 'CA', zip_code: '95126', latitude: 37.3318, longitude: -121.928,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'workspace', 'heating'],
     nightly_price: 225, cleaning_fee: 75, rating: 4.72, review_count: 31,
-    created_datetime: daysAgoDatetime(520), photo_url: '',
+    created_datetime: daysAgoDatetime(520), photo_url: '/photos/p_003.jpg',
   },
   {
     property_id: 'p_004', host_id: 'h_004', status: 'active',
@@ -50,7 +51,7 @@ export const seedProperties: Property[] = [
     address: '610 N 5th St', city: 'San Jose', state: 'CA', zip_code: '95112', latitude: 37.3487, longitude: -121.8945,
     amenities: ['wifi', 'kitchen', 'parking', 'air_conditioning', 'workspace'],
     nightly_price: 159, cleaning_fee: 50, rating: 4.42, review_count: 27,
-    created_datetime: daysAgoDatetime(450), photo_url: '',
+    created_datetime: daysAgoDatetime(450), photo_url: '/photos/p_004.jpg',
   },
   {
     property_id: 'p_005', host_id: 'h_001', status: 'active',
@@ -60,7 +61,7 @@ export const seedProperties: Property[] = [
     address: '377 Santana Row', city: 'San Jose', state: 'CA', zip_code: '95128', latitude: 37.321, longitude: -121.948,
     amenities: ['wifi', 'kitchen', 'parking', 'pool', 'air_conditioning', 'workspace', 'washer', 'dryer', 'ev_charger'],
     nightly_price: 240, cleaning_fee: 80, rating: 4.92, review_count: 64,
-    created_datetime: daysAgoDatetime(700), photo_url: '',
+    created_datetime: daysAgoDatetime(700), photo_url: '/photos/p_005.jpg',
   },
   {
     property_id: 'p_006', host_id: 'h_005', status: 'active',
@@ -70,7 +71,7 @@ export const seedProperties: Property[] = [
     address: '6721 Camino Verde Dr', city: 'San Jose', state: 'CA', zip_code: '95120', latitude: 37.224, longitude: -121.873,
     amenities: ['wifi', 'kitchen', 'parking', 'pool', 'hot_tub', 'washer', 'dryer', 'air_conditioning', 'heating'],
     nightly_price: 310, cleaning_fee: 120, rating: 4.95, review_count: 23,
-    created_datetime: daysAgoDatetime(390), photo_url: '',
+    created_datetime: daysAgoDatetime(390), photo_url: '/photos/p_006.jpg',
   },
   {
     property_id: 'p_007', host_id: 'h_002', status: 'active',
@@ -80,7 +81,7 @@ export const seedProperties: Property[] = [
     address: '88 E San Fernando St', city: 'San Jose', state: 'CA', zip_code: '95113', latitude: 37.3337, longitude: -121.8907,
     amenities: ['wifi', 'kitchen', 'air_conditioning', 'workspace', 'washer'],
     nightly_price: 199, cleaning_fee: 60, rating: 4.78, review_count: 55,
-    created_datetime: daysAgoDatetime(640), photo_url: '',
+    created_datetime: daysAgoDatetime(640), photo_url: '/photos/p_007.jpg',
   },
   {
     property_id: 'p_008', host_id: 'h_006', status: 'active',
@@ -90,7 +91,7 @@ export const seedProperties: Property[] = [
     address: '1021 E San Antonio St', city: 'San Jose', state: 'CA', zip_code: '95116', latitude: 37.3405, longitude: -121.8707,
     amenities: ['wifi', 'kitchen', 'parking', 'heating'],
     nightly_price: 165, cleaning_fee: 45, rating: 4.55, review_count: 12,
-    created_datetime: daysAgoDatetime(210), photo_url: '',
+    created_datetime: daysAgoDatetime(210), photo_url: '/photos/p_008.jpg',
   },
   {
     property_id: 'p_009', host_id: 'h_004', status: 'active',
@@ -100,7 +101,7 @@ export const seedProperties: Property[] = [
     address: '3920 Zanker Rd', city: 'San Jose', state: 'CA', zip_code: '95134', latitude: 37.39, longitude: -121.93,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'dryer', 'workspace', 'ev_charger', 'air_conditioning'],
     nightly_price: 260, cleaning_fee: 90, rating: 4.68, review_count: 37,
-    created_datetime: daysAgoDatetime(480), photo_url: '',
+    created_datetime: daysAgoDatetime(480), photo_url: '/photos/p_009.jpg',
   },
   {
     property_id: 'p_010', host_id: 'h_007', status: 'active',
@@ -110,7 +111,7 @@ export const seedProperties: Property[] = [
     address: '3305 Silver Creek Rd', city: 'San Jose', state: 'CA', zip_code: '95135', latitude: 37.32, longitude: -121.774,
     amenities: ['wifi', 'parking', 'heating', 'air_conditioning'],
     nightly_price: 89, cleaning_fee: 25, rating: 4.81, review_count: 15,
-    created_datetime: daysAgoDatetime(160), photo_url: '',
+    created_datetime: daysAgoDatetime(160), photo_url: '/photos/p_010.jpg',
   },
   {
     property_id: 'p_011', host_id: 'h_005', status: 'active',
@@ -120,7 +121,7 @@ export const seedProperties: Property[] = [
     address: '1575 Berryessa Rd', city: 'San Jose', state: 'CA', zip_code: '95133', latitude: 37.3686, longitude: -121.8746,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'dryer', 'air_conditioning'],
     nightly_price: 175, cleaning_fee: 60, rating: 4.5, review_count: 9,
-    created_datetime: daysAgoDatetime(120), photo_url: '',
+    created_datetime: daysAgoDatetime(120), photo_url: '/photos/p_011.jpg',
   },
   {
     property_id: 'p_012', host_id: 'h_003', status: 'inactive',
@@ -130,7 +131,7 @@ export const seedProperties: Property[] = [
     address: '2140 Union Ave', city: 'San Jose', state: 'CA', zip_code: '95124', latitude: 37.2655, longitude: -121.9318,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'dryer', 'heating', 'hot_tub'],
     nightly_price: 215, cleaning_fee: 85, rating: 4.38, review_count: 21,
-    created_datetime: daysAgoDatetime(560), photo_url: '',
+    created_datetime: daysAgoDatetime(560), photo_url: '/photos/p_012.jpg',
   },
 
   // ---------- Sunnyvale ----------
@@ -142,7 +143,7 @@ export const seedProperties: Property[] = [
     address: '140 S Murphy Ave', city: 'Sunnyvale', state: 'CA', zip_code: '94086', latitude: 37.3772, longitude: -122.03,
     amenities: ['wifi', 'kitchen', 'air_conditioning', 'workspace'],
     nightly_price: 155, cleaning_fee: 45, rating: 4.74, review_count: 33,
-    created_datetime: daysAgoDatetime(430), photo_url: '',
+    created_datetime: daysAgoDatetime(430), photo_url: '/photos/p_013.jpg',
   },
   {
     property_id: 'p_014', host_id: 'h_008', status: 'active',
@@ -152,7 +153,7 @@ export const seedProperties: Property[] = [
     address: '850 Russet Dr', city: 'Sunnyvale', state: 'CA', zip_code: '94087', latitude: 37.361, longitude: -122.026,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'dryer', 'air_conditioning', 'workspace', 'ev_charger'],
     nightly_price: 245, cleaning_fee: 90, rating: 4.83, review_count: 28,
-    created_datetime: daysAgoDatetime(370), photo_url: '',
+    created_datetime: daysAgoDatetime(370), photo_url: '/photos/p_014.jpg',
   },
   {
     property_id: 'p_015', host_id: 'h_002', status: 'active',
@@ -162,7 +163,7 @@ export const seedProperties: Property[] = [
     address: '1072 Lime Dr', city: 'Sunnyvale', state: 'CA', zip_code: '94087', latitude: 37.356, longitude: -122.045,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'dryer', 'heating', 'pool'],
     nightly_price: 285, cleaning_fee: 100, rating: 4.66, review_count: 19,
-    created_datetime: daysAgoDatetime(330), photo_url: '',
+    created_datetime: daysAgoDatetime(330), photo_url: '/photos/p_015.jpg',
   },
   {
     property_id: 'p_016', host_id: 'h_008', status: 'active',
@@ -172,7 +173,7 @@ export const seedProperties: Property[] = [
     address: '1200 Bordeaux Dr', city: 'Sunnyvale', state: 'CA', zip_code: '94089', latitude: 37.403, longitude: -122.018,
     amenities: ['wifi', 'kitchen', 'parking', 'workspace', 'air_conditioning', 'washer'],
     nightly_price: 210, cleaning_fee: 70, rating: 4.58, review_count: 47,
-    created_datetime: daysAgoDatetime(500), photo_url: '',
+    created_datetime: daysAgoDatetime(500), photo_url: '/photos/p_016.jpg',
   },
   {
     property_id: 'p_017', host_id: 'h_007', status: 'active',
@@ -182,7 +183,7 @@ export const seedProperties: Property[] = [
     address: '1015 Lakewood Dr', city: 'Sunnyvale', state: 'CA', zip_code: '94089', latitude: 37.399, longitude: -121.995,
     amenities: ['wifi', 'parking', 'heating'],
     nightly_price: 79, cleaning_fee: 20, rating: 4.47, review_count: 11,
-    created_datetime: daysAgoDatetime(140), photo_url: '',
+    created_datetime: daysAgoDatetime(140), photo_url: '/photos/p_017.jpg',
   },
   {
     property_id: 'p_018', host_id: 'h_004', status: 'active',
@@ -192,7 +193,7 @@ export const seedProperties: Property[] = [
     address: '636 Harwick Way', city: 'Sunnyvale', state: 'CA', zip_code: '94087', latitude: 37.346, longitude: -122.04,
     amenities: ['wifi', 'kitchen', 'parking', 'air_conditioning'],
     nightly_price: 135, cleaning_fee: 40, rating: 4.89, review_count: 26,
-    created_datetime: daysAgoDatetime(260), photo_url: '',
+    created_datetime: daysAgoDatetime(260), photo_url: '/photos/p_018.jpg',
   },
   {
     property_id: 'p_019', host_id: 'h_006', status: 'active',
@@ -202,7 +203,7 @@ export const seedProperties: Property[] = [
     address: '355 S Taaffe St', city: 'Sunnyvale', state: 'CA', zip_code: '94086', latitude: 37.37, longitude: -122.036,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'heating', 'workspace'],
     nightly_price: 199, cleaning_fee: 70, rating: 4.71, review_count: 14,
-    created_datetime: daysAgoDatetime(230), photo_url: '',
+    created_datetime: daysAgoDatetime(230), photo_url: '/photos/p_019.jpg',
   },
   {
     property_id: 'p_020', host_id: 'h_005', status: 'active',
@@ -212,7 +213,7 @@ export const seedProperties: Property[] = [
     address: '780 N Fair Oaks Ave', city: 'Sunnyvale', state: 'CA', zip_code: '94085', latitude: 37.388, longitude: -122.017,
     amenities: ['wifi', 'kitchen', 'parking', 'pool', 'air_conditioning', 'washer', 'dryer'],
     nightly_price: 189, cleaning_fee: 65, rating: 4.62, review_count: 22,
-    created_datetime: daysAgoDatetime(310), photo_url: '',
+    created_datetime: daysAgoDatetime(310), photo_url: '/photos/p_020.jpg',
   },
   {
     property_id: 'p_021', host_id: 'h_008', status: 'active',
@@ -222,7 +223,7 @@ export const seedProperties: Property[] = [
     address: '811 Henderson Ave', city: 'Sunnyvale', state: 'CA', zip_code: '94086', latitude: 37.366, longitude: -122.008,
     amenities: ['wifi', 'kitchen', 'heating'],
     nightly_price: 119, cleaning_fee: 35, rating: 4.35, review_count: 8,
-    created_datetime: daysAgoDatetime(100), photo_url: '',
+    created_datetime: daysAgoDatetime(100), photo_url: '/photos/p_021.jpg',
   },
 
   // ---------- Mountain View ----------
@@ -234,7 +235,7 @@ export const seedProperties: Property[] = [
     address: '236 Castro St', city: 'Mountain View', state: 'CA', zip_code: '94041', latitude: 37.3935, longitude: -122.079,
     amenities: ['wifi', 'kitchen', 'air_conditioning', 'workspace', 'washer'],
     nightly_price: 229, cleaning_fee: 70, rating: 4.84, review_count: 51,
-    created_datetime: daysAgoDatetime(590), photo_url: '',
+    created_datetime: daysAgoDatetime(590), photo_url: '/photos/p_022.jpg',
   },
   {
     property_id: 'p_023', host_id: 'h_007', status: 'active',
@@ -244,7 +245,7 @@ export const seedProperties: Property[] = [
     address: '512 Mercy St', city: 'Mountain View', state: 'CA', zip_code: '94041', latitude: 37.387, longitude: -122.08,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'dryer', 'heating', 'workspace', 'ev_charger'],
     nightly_price: 345, cleaning_fee: 120, rating: 4.93, review_count: 38,
-    created_datetime: daysAgoDatetime(670), photo_url: '',
+    created_datetime: daysAgoDatetime(670), photo_url: '/photos/p_023.jpg',
   },
   {
     property_id: 'p_024', host_id: 'h_001', status: 'active',
@@ -254,7 +255,7 @@ export const seedProperties: Property[] = [
     address: '1650 Plymouth St', city: 'Mountain View', state: 'CA', zip_code: '94043', latitude: 37.41, longitude: -122.077,
     amenities: ['wifi', 'kitchen', 'parking', 'workspace', 'air_conditioning', 'washer', 'dryer', 'ev_charger'],
     nightly_price: 265, cleaning_fee: 90, rating: 4.76, review_count: 29,
-    created_datetime: daysAgoDatetime(410), photo_url: '',
+    created_datetime: daysAgoDatetime(410), photo_url: '/photos/p_024.jpg',
   },
   {
     property_id: 'p_025', host_id: 'h_006', status: 'active',
@@ -264,7 +265,7 @@ export const seedProperties: Property[] = [
     address: '1544 Cuesta Dr', city: 'Mountain View', state: 'CA', zip_code: '94040', latitude: 37.372, longitude: -122.088,
     amenities: ['wifi', 'kitchen', 'parking', 'heating'],
     nightly_price: 149, cleaning_fee: 45, rating: 4.69, review_count: 17,
-    created_datetime: daysAgoDatetime(250), photo_url: '',
+    created_datetime: daysAgoDatetime(250), photo_url: '/photos/p_025.jpg',
   },
   {
     property_id: 'p_026', host_id: 'h_008', status: 'active',
@@ -274,7 +275,7 @@ export const seedProperties: Property[] = [
     address: '2025 Rock St', city: 'Mountain View', state: 'CA', zip_code: '94043', latitude: 37.402, longitude: -122.094,
     amenities: ['wifi', 'parking', 'workspace'],
     nightly_price: 95, cleaning_fee: 25, rating: 4.52, review_count: 13,
-    created_datetime: daysAgoDatetime(170), photo_url: '',
+    created_datetime: daysAgoDatetime(170), photo_url: '/photos/p_026.jpg',
   },
   {
     property_id: 'p_027', host_id: 'h_003', status: 'active',
@@ -284,7 +285,7 @@ export const seedProperties: Property[] = [
     address: '415 E Middlefield Rd', city: 'Mountain View', state: 'CA', zip_code: '94043', latitude: 37.397, longitude: -122.056,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'dryer', 'air_conditioning'],
     nightly_price: 205, cleaning_fee: 70, rating: 4.41, review_count: 16,
-    created_datetime: daysAgoDatetime(290), photo_url: '',
+    created_datetime: daysAgoDatetime(290), photo_url: '/photos/p_027.jpg',
   },
   {
     property_id: 'p_028', host_id: 'h_004', status: 'active',
@@ -294,7 +295,7 @@ export const seedProperties: Property[] = [
     address: '1890 Montecito Ave', city: 'Mountain View', state: 'CA', zip_code: '94043', latitude: 37.409, longitude: -122.096,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'dryer', 'pool', 'heating', 'hot_tub'],
     nightly_price: 299, cleaning_fee: 110, rating: 4.79, review_count: 24,
-    created_datetime: daysAgoDatetime(540), photo_url: '',
+    created_datetime: daysAgoDatetime(540), photo_url: '/photos/p_028.jpg',
   },
   {
     property_id: 'p_029', host_id: 'h_005', status: 'active',
@@ -304,7 +305,7 @@ export const seedProperties: Property[] = [
     address: '170 Bryant St', city: 'Mountain View', state: 'CA', zip_code: '94041', latitude: 37.39, longitude: -122.082,
     amenities: ['wifi', 'kitchen', 'air_conditioning', 'workspace', 'parking'],
     nightly_price: 175, cleaning_fee: 55, rating: 4.65, review_count: 36,
-    created_datetime: daysAgoDatetime(460), photo_url: '',
+    created_datetime: daysAgoDatetime(460), photo_url: '/photos/p_029.jpg',
   },
   {
     property_id: 'p_030', host_id: 'h_007', status: 'active',
@@ -314,6 +315,6 @@ export const seedProperties: Property[] = [
     address: '725 Sylvan Ave', city: 'Mountain View', state: 'CA', zip_code: '94040', latitude: 37.381, longitude: -122.07,
     amenities: ['wifi', 'kitchen', 'parking', 'washer', 'dryer', 'air_conditioning', 'ev_charger'],
     nightly_price: 255, cleaning_fee: 85, rating: 4.88, review_count: 12,
-    created_datetime: daysAgoDatetime(190), photo_url: '',
+    created_datetime: daysAgoDatetime(190), photo_url: '/photos/p_030.jpg',
   },
 ]

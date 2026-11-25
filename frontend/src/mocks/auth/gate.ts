@@ -152,6 +152,9 @@ export const authGate = http.all('*', async ({ request }) => {
   // A window that just opened first takes the current data from the other windows (mocks/sync.ts).
   await syncReady
   const url = new URL(request.url)
+  // A request to another address is for a real service (its VITE_..._API_BASE_URL is set):
+  // that service checks the token itself.
+  if (typeof location !== 'undefined' && url.origin !== location.origin) return
   const rule = RULES.find((r) => r.method === request.method && r.path.test(url.pathname))
   if (!rule) return // not an API endpoint we mock: let the other handlers decide
 

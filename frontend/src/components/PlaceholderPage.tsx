@@ -8,7 +8,7 @@ type Props = {
 function PlaceholderPage({ title, specItems }: Props) {
   return (
     <section>
-      <h1 className="font-condensed text-3xl font-bold tracking-[0.06em] uppercase">{title}</h1>
+      <h1 className="cornice font-display text-3xl font-bold">{title}</h1>
       <p className="mt-2 text-fg-muted">Not built yet. This page will have:</p>
       <ul className="mt-3 list-disc space-y-1 pl-6 text-fg-soft">
         {specItems.map((item) => (

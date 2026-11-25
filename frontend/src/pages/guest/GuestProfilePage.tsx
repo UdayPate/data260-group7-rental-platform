@@ -88,7 +88,7 @@ function GuestProfile({ guestId }: { guestId: string }) {
   return (
     <section className="max-w-3xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="font-display text-4xl font-bold">{editing ? 'Edit profile' : 'My profile'}</h1>
+        <h1 className="cornice font-display text-4xl font-bold">{editing ? 'Edit profile' : 'My profile'}</h1>
       </div>
 
       {notice && (

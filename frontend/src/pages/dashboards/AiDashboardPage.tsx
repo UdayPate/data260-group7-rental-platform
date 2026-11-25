@@ -76,7 +76,7 @@ function AiCharts({ data }: { data: AiDashboard }) {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-condensed text-3xl font-bold tracking-[0.06em] uppercase">AI dashboard</h1>
+      <h1 className="cornice font-display text-3xl font-bold">AI dashboard</h1>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile label={data.trace_id ? 'Debate' : `Debates, last ${data.days} days`} value={String(data.debates)} source={data.sources.debates} />
         <KpiTile label="Challenges per debate" value={data.average_challenges.toFixed(1)} sub="the Fairness Auditor is always challenged" source={data.sources.debates} />

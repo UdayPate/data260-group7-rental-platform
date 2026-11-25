@@ -1,6 +1,6 @@
 // The pill search bar in the header (guest mode): where, check-in, check-out, guests.
-// Typing doesn't search yet; clicking Search puts the values in the URL and goes to "/",
-// where the search page reads them. Filters from the cream strip are kept.
+// Typing doesn't search yet; clicking Search puts the values in the URL and goes to "/search",
+// where the search page reads them. Filters from the travertine strip are kept.
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { localDate } from '../dates'
@@ -21,7 +21,7 @@ function SearchBar() {
   const { pathname } = useLocation()
   const [searchParams] = useSearchParams()
   // Only the search page's URL holds search filters; on other pages start empty.
-  const current = readFilters(pathname === '/' ? searchParams : new URLSearchParams())
+  const current = readFilters(pathname === '/search' ? searchParams : new URLSearchParams())
 
   const [location, setLocation] = useState(current.location)
   const [checkIn, setCheckIn] = useState(current.check_in)
@@ -48,7 +48,7 @@ function SearchBar() {
       // keeps whatever the guest chose if dates were already there, and is off without dates.
       available_only: hasDates ? (hadDates ? current.available_only : true) : false,
     }
-    navigate(`/?${writeFilters(next).toString()}`)
+    navigate(`/search?${writeFilters(next).toString()}`)
   }
 
   return (

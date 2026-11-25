@@ -69,7 +69,7 @@ function Messages({ userId, role }: { userId: string; role: Role }) {
 
   return (
     <section className="space-y-4">
-      <h1 className="font-display text-4xl font-bold">Messages</h1>
+      <h1 className="cornice font-display text-4xl font-bold">Messages</h1>
       {error && (
         <ErrorBanner
           message={error}
@@ -101,13 +101,13 @@ function Messages({ userId, role }: { userId: string; role: Role }) {
                 onClick={() => setSearchParams({ thread: t.thread_id })}
                 aria-current={active ? 'true' : undefined}
                 className={`block w-full rounded-2xl border p-3 text-left ${
-                  active ? 'border-mustard bg-surface-2' : 'border-line bg-surface hover:bg-surface-2'
+                  active ? 'border-gold bg-surface-2' : 'border-line bg-surface hover:bg-surface-2'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className={unread ? 'font-bold text-fg' : 'font-semibold text-fg-soft'}>{otherName(t, role)}</span>
                   {unread && (
-                    <span data-thread-unread className="rounded-full bg-mustard px-1.5 py-0.5 text-xs font-bold text-bg">
+                    <span data-thread-unread className="rounded-full bg-gold px-1.5 py-0.5 text-xs font-bold text-bg">
                       {t.unread_count}
                     </span>
                   )}
@@ -306,7 +306,7 @@ function Conversation({ threadId, userId, role }: { threadId: string; userId: st
           maxLength={MESSAGE_TEXT_MAX}
           aria-label="Write a message"
           placeholder="Write a message… (Enter to send, Shift+Enter for a new line)"
-          className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg placeholder:text-fg-muted focus:border-mustard focus:outline-none"
+          className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg placeholder:text-fg-muted focus:border-gold focus:outline-none"
         />
         {sendError && <ErrorBanner message={sendError} onDismiss={() => setSendError(null)} />}
         <div className="flex justify-end">

@@ -11,4 +11,15 @@ export default defineConfig({
     // about file changes. Polling = Vite checks the files itself every so often instead.
     watch: { usePolling: true },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        // The mock code (only loaded when mocks are on) is big: put the MSW library in its
+        // own file, separate from our mock handlers and seed data, so no file is over 500 kB.
+        codeSplitting: {
+          groups: [{ name: 'msw', test: /node_modules[\\/](msw|@mswjs)/ }],
+        },
+      },
+    },
+  },
 })

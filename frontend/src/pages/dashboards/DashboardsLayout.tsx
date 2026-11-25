@@ -49,7 +49,7 @@ function DashboardsLayout() {
             to={tabLink(tab.path)}
             className={({ isActive }) =>
               `rounded-full border px-4 py-1 font-semibold ${
-                isActive ? 'border-mustard-border bg-mustard text-bg' : 'border-line text-fg-muted hover:text-fg'
+                isActive ? 'border-gold-border bg-gold text-bg' : 'border-line text-fg-muted hover:text-fg'
               }`
             }
           >

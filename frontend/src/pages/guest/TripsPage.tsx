@@ -91,7 +91,7 @@ function Trips({ guestId }: { guestId: string }) {
 
   return (
     <section className="space-y-6">
-      <h1 className="font-display text-4xl font-bold">My trips</h1>
+      <h1 className="cornice font-display text-4xl font-bold">My trips</h1>
 
       {notice && (
         <div role="status" className="rounded-2xl border border-status-ok bg-surface px-4 py-3 text-status-ok">
@@ -111,13 +111,13 @@ function Trips({ guestId }: { guestId: string }) {
       {loading && <p className="text-fg-muted">Loading your trips…</p>}
 
       {!loading && !error && toReview.length > 0 && (
-        <div data-to-review className="space-y-3 rounded-2xl border border-cream-border bg-cream p-4 text-cream-ink">
+        <div data-to-review className="space-y-3 rounded-2xl border border-travertine-border bg-travertine p-4 text-travertine-ink">
           <p className="font-condensed text-lg font-bold tracking-[0.06em] uppercase">To review</p>
           {toReview.map((r) => (
             <div key={r.reservation_id} className="flex flex-wrap items-center justify-between gap-3">
               <p>
                 How was <strong>{titleOf(r.property_id)}</strong>?{' '}
-                <span className="text-cream-ink-soft">
+                <span className="text-travertine-ink-soft">
                   {formatDate(r.check_in)} → {formatDate(r.check_out)}
                 </span>
               </p>
@@ -140,7 +140,7 @@ function Trips({ guestId }: { guestId: string }) {
                 aria-selected={tab === t.id}
                 onClick={() => setSearchParams(t.id === 'upcoming' ? {} : { tab: t.id })}
                 className={`rounded-full border px-4 py-1.5 font-semibold ${
-                  tab === t.id ? 'border-mustard-border bg-mustard text-bg' : 'border-line text-fg-muted hover:text-fg'
+                  tab === t.id ? 'border-gold-border bg-gold text-bg' : 'border-line text-fg-muted hover:text-fg'
                 }`}
               >
                 {t.label} ({count(t.id)})
@@ -157,7 +157,7 @@ function Trips({ guestId }: { guestId: string }) {
               {tab === 'upcoming' ? (
                 <>
                   No upcoming trips.{' '}
-                  <Link to="/" className="font-semibold text-primary hover:underline">
+                  <Link to="/search" className="font-semibold text-primary hover:underline">
                     Find a stay
                   </Link>
                 </>
@@ -247,8 +247,8 @@ function MyReviews({ reviews, reservations, titleOf }: MyReviewsProps) {
             </p>
             <p className="text-fg-soft">{v.review_text}</p>
             {v.response_text ? (
-              <div className="rounded-xl border-l-4 border-mustard bg-surface-2 p-3 text-sm">
-                <p className="font-semibold text-mustard">Host’s reply</p>
+              <div className="rounded-xl border-l-4 border-gold bg-surface-2 p-3 text-sm">
+                <p className="font-semibold text-gold">Host’s reply</p>
                 <p className="text-fg-soft">{v.response_text}</p>
               </div>
             ) : (

@@ -1,18 +1,13 @@
-// The brand name as a logo: Fraunces, with every "&" in terracotta (CLAUDE.md).
+// The brand logo: the gold arch mark, then the name in capitals ("XENIA") in Cinzel.
 // The name itself comes from src/brand.ts.
-import { Fragment } from 'react'
 import { BRAND } from '../brand'
+import { ArchMark } from './icons'
 
 function BrandLogo({ className = '' }: { className?: string }) {
-  const parts = BRAND.name.split('&') // "Cedar & Rye" -> ["Cedar ", " Rye"]
   return (
-    <span className={`font-display font-extrabold whitespace-nowrap ${className}`}>
-      {parts.map((part, i) => (
-        <Fragment key={i}>
-          {i > 0 && <span className="text-primary">&amp;</span>}
-          {part}
-        </Fragment>
-      ))}
+    <span className={`inline-flex items-center gap-2 font-display font-bold tracking-[0.12em] whitespace-nowrap uppercase ${className}`}>
+      <ArchMark className="h-[0.9em] w-[0.9em] text-gold" />
+      {BRAND.name}
     </span>
   )
 }

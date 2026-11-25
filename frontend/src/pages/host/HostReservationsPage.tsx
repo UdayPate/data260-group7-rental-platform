@@ -108,7 +108,7 @@ function HostReservations({ hostId, onReload }: { hostId: string; onReload: () =
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-condensed text-3xl font-bold tracking-[0.06em] uppercase">Reservations</h1>
+        <h1 className="cornice font-display text-3xl font-bold">Reservations</h1>
         <div className="flex items-center gap-3">
           <select
             value={listingFilter}
@@ -138,7 +138,7 @@ function HostReservations({ hostId, onReload }: { hostId: string; onReload: () =
             aria-selected={tab === t.id}
             onClick={() => setParam('tab', t.id === 'requests' ? '' : t.id)}
             className={`rounded-full border px-4 py-1.5 font-semibold ${
-              tab === t.id ? 'border-mustard-border bg-mustard text-bg' : 'border-line text-fg-muted hover:text-fg'
+              tab === t.id ? 'border-gold-border bg-gold text-bg' : 'border-line text-fg-muted hover:text-fg'
             }`}
           >
             {t.label} {!loading && !error && `(${countFor(t.id)})`}
@@ -298,7 +298,7 @@ function ReservationRow({ reservation: r, listingTitle, guestName, hostId, onUpd
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={2}
-              className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg focus:border-mustard focus:outline-none"
+              className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg focus:border-gold focus:outline-none"
             />
           </label>
           <div className="flex gap-3">

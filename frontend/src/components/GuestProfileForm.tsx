@@ -79,7 +79,7 @@ type Props = {
 }
 
 const inputClass =
-  'w-full rounded-full border border-line bg-surface-2 px-4 py-2 text-fg placeholder:text-fg-muted focus:border-mustard focus:outline-none'
+  'w-full rounded-full border border-line bg-surface-2 px-4 py-2 text-fg placeholder:text-fg-muted focus:border-gold focus:outline-none'
 
 function GuestProfileForm({ guest, submitLabel, onSubmit, onCancel }: Props) {
   const [values, setValues] = useState<FormValues>(guest ? toFormValues(guest) : EMPTY)

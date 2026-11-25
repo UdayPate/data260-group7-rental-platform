@@ -33,7 +33,7 @@ type RequestError = { message: string; code?: string; reservationId?: string }
 
 const labelClass = 'font-condensed text-xs font-bold tracking-[0.08em] text-fg-muted uppercase'
 const inputClass =
-  'w-full rounded-full border border-line bg-surface-2 px-4 py-2 text-fg focus:border-mustard focus:outline-none [color-scheme:dark]'
+  'w-full rounded-full border border-line bg-surface-2 px-4 py-2 text-fg focus:border-gold focus:outline-none [color-scheme:dark]'
 
 function BookingPanel(props: Props) {
   const { property, blocks, guestId, checkIn, checkOut, guests } = props
@@ -144,7 +144,7 @@ function BookingPanel(props: Props) {
           onChange={(e) => setMessage(e.target.value)}
           rows={3}
           placeholder="Say hello and share why you’re visiting"
-          className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg placeholder:text-fg-muted focus:border-mustard focus:outline-none"
+          className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-2 text-fg placeholder:text-fg-muted focus:border-gold focus:outline-none"
         />
       </label>
 
