@@ -147,9 +147,10 @@ checks them against the token.
 | `/messages/send` | guest or host, own `sender_id` |
 | `/reviews/create`, `/reviews/byGuest` | guest, own `guest_id` |
 | `/reviews/respond` | host, own `host_id` |
-| `POST /ai/requests`, `/ai/tasks/{id}/approve`, `/reject` | guest, own `guest_id` |
+| `POST /ai/requests`, `/ai/tasks/{id}/approve`, `/reject` | guest, own `guest_id` (a rerun's `parent_task_id` must also be their own task) |
 | `GET /ai/tasks/{id}`, `GET /ai/results/{id}` | the guest who made the request |
 | WebSocket `/ai/tasks/{id}/stream` | `?token=` required (else close `4401`); only the guest who made the request (else close `4403`) |
+| `GET /ai/feedback`, `GET /ai/versions`, `POST /ai/versions/{id}/promote`, `/rollback` | **admin only** |
 | `POST /events/ingest` | any logged-in user |
 | `GET /analytics/guest/dashboard` | guest, own `guest_id` |
 | `GET /analytics/host/dashboard` | host, own `host_id` |
@@ -695,12 +696,16 @@ approves, edits or rejects the result. Types: `frontend/src/types/ai.ts`. Mock:
 
 | Endpoint | Request | Response |
 |---|---|---|
-| `POST /ai/requests` | `{ "guest_id", "request_text" (10–500 chars), "demo"?: { "delay_risk_agent"?: bool, "invalid_agent_output"?: bool } }` | `202 { "task_id", "trace_id", "status": "waiting" }` |
+| `POST /ai/requests` | `{ "guest_id", "request_text" (10–500 chars), "demo"?: { "delay_risk_agent"?: bool, "invalid_agent_output"?: bool }, "weights"?: MatcherWeights, "parent_task_id"?: string }`. `weights` and `parent_task_id` are optional and **new** (spec 13.6, see 6.7). | `202 { "task_id", "trace_id", "status": "waiting" }` |
 | `GET /ai/tasks/{task_id}` | none | `{ "task": AiTask, "events": StreamEvent[] }`: the task **and every event so far**, in `seq` order (so a reload rebuilds the debate) |
 | `GET /ai/results/{task_id}` | none | `AiResult`; `409 INVALID_STATUS` while the debate is still running |
 | `POST /ai/tasks/{task_id}/approve` | `{ "guest_id", "edits"?: { "property_id"?, "rationale"? }, "reason"? }` | updated `AiResult`. With any real edit, the decision is `"edited"`, otherwise `"approved"`. `edits.property_id` must be one of `result.ranked` (else `400`). |
 | `POST /ai/tasks/{task_id}/reject` | `{ "guest_id", "reason" }` (reason required) | updated `AiResult` with decision `"rejected"` |
 | WebSocket `/ai/tasks/{task_id}/stream?after_seq=N` | none | see 6.3 |
+| `GET /ai/feedback` | none | `{ "items": FeedbackItem[] }`, newest first (**admin only**, see 6.8) |
+| `GET /ai/versions` | none | `VersionsResponse` (**admin only**, see 6.8) |
+| `POST /ai/versions/{version_id}/promote` | `{}` | `VersionsResponse` with `version_id` active (**admin only**). `404` unknown version, `409 INVALID_STATUS` if it is already active or older than the active one (then use rollback). |
+| `POST /ai/versions/{version_id}/rollback` | `{}` | `VersionsResponse` with the older `version_id` active again (**admin only**). `409 INVALID_STATUS` if it is already active or newer than the active one. |
 
 Errors use the normal error format: unknown task `404`; a different guest approving or rejecting
 `403 UNAUTHORIZED`; approving/rejecting before the result exists, or a second time,
@@ -724,6 +729,9 @@ booking, change availability or send a message.
 | demo | `{ delay_risk_agent: bool, invalid_agent_output: bool }` | the demo switches used (both `false` by default) |
 | plan | Plan \| null | |
 | requirements | ParsedRequirements \| null | |
+| matcher_version | string | **new**: the Matcher version active when the task started, e.g. `"matcher-v1"` (spec 7.5.4) |
+| weights | MatcherWeights | **new**: the weights the Matcher used (the version's, or the request's own on a rerun) |
+| parent_task_id | string \| null | **new**: on a rerun, the task it reruns |
 | created_datetime / updated_datetime | datetime | |
 | error | string \| null | |
 
@@ -763,6 +771,8 @@ Analysis agents (round 0 opinions, round 2 votes): `matcher`, `risk`, `fairness`
 | suggestions | string[] | only when nothing matched (travel coach style hints) |
 | check_in, check_out, guest_count | from the requirements | carried to the booking page |
 | human_decision | HumanDecision \| null | |
+| matcher_version, weights, parent_task_id | as on AiTask | **new** |
+| matcher_ranking | MatcherRankEntry[] | **new**: the Matcher's own top 10, **measured numbers only** (see 6.7), so two runs can be compared |
 | created_datetime | datetime | when the result was published |
 
 **HumanDecision**: `{ decision: "approved"|"edited"|"rejected", guest_id, reason, edited_property_id, edited_rationale, decided_datetime }`.
@@ -855,6 +865,49 @@ Three or more debates can run at the same time. To keep them apart:
 4. The UI double-checks: any event with another `trace_id` or `task_id` is **dropped**, logged as
    `[ai-stream] DROPPED event from another trace` in the browser console, and counted on the page.
    A debate page must never show another debate's messages.
+
+
+### 6.7 Matcher weights and reruns (spec 13.6)
+
+**MatcherWeights** = `{ amenity_fit, price, rating, risk_penalty, review_count }`, each a number **0–1**
+(not all 0). The Matcher's score for a listing is
+
+`(amenity_fit·A + price·P + rating·R + review_count·C − risk_penalty·K) / (sum of the five weights)`, clamped to 0–1,
+
+where the **parts** are measured values from 0 to 1: A = share of the requested amenities the listing has,
+P = how far under the budget it is, R = rating above 4 (`rating − 4`), C = review count / 60, K = host risk
+(0.6 if the host cancelled stays, +0.25 if they reply to under 80% of messages, +0.15 if unverified).
+**Must-haves** (guests, dates free, budget, property type, minimum rating) are not a weight: a listing that
+misses one always ranks below every listing that meets them; the weights order listings within each group.
+
+**MatcherRankEntry** = `{ rank, property_id, title, score, meets_must_haves, parts: { amenity_fit, price, rating, risk_penalty, review_count } }`.
+
+**Rerun:** `POST /ai/requests` with the **same** `request_text`, new `weights` and `parent_task_id` starts a full
+new debate (new `task_id` and `trace_id`). Rules: `parent_task_id` must exist (`404`) and belong to the same
+guest (`403`); the text must equal the parent's (`400`); every weight 0–1 and not all 0 (`400`). The UI
+compares the two results' `matcher_ranking` (ranks, scores, which weight change moved the #1) and shows the
+generated `rationale` separately.
+
+### 6.8 Self-improvement: feedback and versions (spec 7.5.4, 7.5.5)
+
+**FeedbackItem** = `{ feedback_id, trace_id, task_id, guest_id, recommended_property_id, recommended_title,
+decision ("approved"|"edited"|"rejected"), reason, decided_datetime, sample (bool), outcome
+("led_to_version"|"rejected"|null), outcome_version, outcome_reason }`. Every human decision on a result
+becomes one item; `sample: true` marks labelled sample entries. `outcome` records what the team did with it:
+it led to a new version (e.g. `matcher-v2`), or it was rejected as insufficient or unreliable (with the reason).
+
+**MatcherVersion** = `{ version_id, change, weights: MatcherWeights, based_on_feedback_ids, evaluation, created_datetime }`,
+**VersionEvaluation** = `{ precision_at_10, recall_at_10, mean_rank, avg_latency_ms }` on the fixed evaluation set.
+
+**VersionsResponse** = `{ active_version_id, versions: MatcherVersion[] (oldest first), baseline: { name } + VersionEvaluation,
+history: { action ("promote"|"rollback"), version_id, by_id, by_name, at }[], evaluation_sample (bool) }`.
+
+Rules: a change to the Matcher is a **new version** (`matcher-v2`), never an edit of the old one; the old
+version stays available for rollback. **Nothing is promoted automatically**: only the admin promotes, after
+comparing the evaluation with the previous version and the baseline. A debate uses the version that is
+active when it starts and records it (`matcher_version`). The mock's versions: `matcher-v1` (weights
+0.6 / 0.35 / 0.1 / 0 / 0.1) and `matcher-v2` (review_count 0, the change the Fairness Auditor proposes).
+The evaluation numbers are sample values until the team's evaluation run (`evaluation_sample: true`).
 
 ---
 

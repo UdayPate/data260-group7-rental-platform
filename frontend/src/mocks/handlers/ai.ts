@@ -1,12 +1,82 @@
 // Mock AI Agent Service: REST endpoints + the WebSocket debate stream.
 import { delay, http, HttpResponse, passthrough, ws } from 'msw'
-import type { AiResult, HumanDecision } from '../../types/ai'
-import { socketClaims } from '../auth/gate'
-import { CLOSE_DELAY_MS, getTaskEntry, isFinished, publish, startTask, subscribe } from '../ai/bus'
+import type { AiResult, FeedbackItem, HumanDecision, MatcherWeights, VersionsResponse } from '../../types/ai'
+import { WEIGHT_KEYS } from '../../types/ai'
+import { requestClaims, socketClaims } from '../auth/gate'
+import { allTaskEntries, CLOSE_DELAY_MS, getTaskEntry, isFinished, publish, startTask, subscribe } from '../ai/bus'
+import { BASELINE, SAMPLE_FEEDBACK, state as versionState, VERSIONS, versionById } from '../ai/versions'
 import { db } from '../db'
 import { errorResponse, invalidJsonResponse, MOCK_DELAY_MS, readBody, requireFields } from '../responses'
 
 const taskNotFound = (id: unknown) => errorResponse('NOT_FOUND', `No AI task found with id ${String(id)}.`)
+
+// Checks optional rerun weights: all five, each a number from 0 to 1, not all zero.
+// Returns the weights, or an error message.
+function readWeights(value: unknown): MatcherWeights | string {
+  if (typeof value !== 'object' || value === null) return 'weights must be an object with the five Matcher weights.'
+  const w = value as Record<string, unknown>
+  for (const key of WEIGHT_KEYS) {
+    const n = w[key]
+    if (typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > 1) return `weights.${key} must be a number from 0 to 1.`
+  }
+  const extra = Object.keys(w).filter((k) => !(WEIGHT_KEYS as readonly string[]).includes(k))
+  if (extra.length > 0) return `Unknown weight(s): ${extra.join(', ')}.`
+  if (WEIGHT_KEYS.every((k) => w[k] === 0)) return 'At least one weight must be above 0.'
+  return w as MatcherWeights
+}
+
+// Every human decision so far, newest first, plus the labelled sample entries (team decision V1a).
+function feedbackItems(): FeedbackItem[] {
+  const real: FeedbackItem[] = allTaskEntries()
+    .filter((e) => e.result?.human_decision)
+    .map((e) => {
+      const d = e.result!.human_decision!
+      const recommended = e.result!.recommended
+      return {
+        feedback_id: `fb_${e.task.task_id}_${e.task.trace_id.slice(0, 8)}`,
+        trace_id: e.task.trace_id,
+        task_id: e.task.task_id,
+        guest_id: d.guest_id,
+        recommended_property_id: recommended?.property_id ?? null,
+        recommended_title: recommended?.title ?? null,
+        decision: d.decision,
+        reason: d.reason ?? d.edited_rationale,
+        decided_datetime: d.decided_datetime,
+        sample: false,
+        outcome: null,
+        outcome_version: null,
+        outcome_reason: null,
+      }
+    })
+  return [...real, ...SAMPLE_FEEDBACK].sort((a, b) => b.decided_datetime.localeCompare(a.decided_datetime))
+}
+
+function versionsResponse(): VersionsResponse {
+  return {
+    active_version_id: versionState.active_version_id,
+    versions: VERSIONS,
+    baseline: BASELINE,
+    history: versionState.history,
+    evaluation_sample: true,
+  }
+}
+
+// Promote (to a newer version) or roll back (to an older one). Admin only (checked by the gate).
+async function switchVersion(request: Request, versionId: string, action: 'promote' | 'rollback') {
+  await delay(MOCK_DELAY_MS)
+  const target = versionById(versionId)
+  if (!target) return errorResponse('NOT_FOUND', `No matcher version ${versionId}.`)
+  if (versionId === versionState.active_version_id) {
+    return errorResponse('INVALID_STATUS', `${versionId} is already the active version.`)
+  }
+  const newer = VERSIONS.indexOf(target) > VERSIONS.findIndex((v) => v.version_id === versionState.active_version_id)
+  if (action === 'promote' && !newer) return errorResponse('INVALID_STATUS', `${versionId} is older than the active version: roll back to it instead.`)
+  if (action === 'rollback' && newer) return errorResponse('INVALID_STATUS', `${versionId} is newer than the active version: promote it instead.`)
+  const admin = (await requestClaims(request))!
+  versionState.active_version_id = versionId
+  versionState.history.push({ action, version_id: versionId, by_id: admin.sub, by_name: admin.name, at: new Date().toISOString() })
+  return HttpResponse.json(versionsResponse())
+}
 
 // The page URL /ai/tasks/:taskId is the same path as the API's GET /ai/tasks/{task_id}
 // when both are on the same server (mock mode). A page load (the browser asking for HTML)
@@ -94,11 +164,33 @@ export const aiHandlers = [
     if (!db.guests.some((g) => g.guest_id === body.guest_id)) {
       return errorResponse('NOT_FOUND', `No guest found with id ${String(body.guest_id)}.`)
     }
+    // Optional rerun (spec 13.6): new weights, and the task it reruns.
+    let weights: MatcherWeights | null = null
+    if (body.weights !== undefined) {
+      const checked = readWeights(body.weights)
+      if (typeof checked === 'string') return errorResponse('VALIDATION_ERROR', checked)
+      weights = checked
+    }
+    let parentTaskId: string | null = null
+    if (body.parent_task_id !== undefined) {
+      const parent = getTaskEntry(String(body.parent_task_id))
+      if (!parent) return taskNotFound(body.parent_task_id)
+      if (parent.task.guest_id !== body.guest_id) return errorResponse('UNAUTHORIZED', 'You can only rerun your own AI requests.')
+      if (parent.task.request_text !== text) {
+        return errorResponse('VALIDATION_ERROR', 'A rerun must use the same request text as the request it reruns.')
+      }
+      parentTaskId = parent.task.task_id
+    }
     const demo = (body.demo ?? {}) as Record<string, unknown>
-    const task = startTask(String(body.guest_id), text, {
-      delay_risk_agent: demo.delay_risk_agent === true,
-      invalid_agent_output: demo.invalid_agent_output === true,
-    })
+    const task = startTask(
+      String(body.guest_id),
+      text,
+      {
+        delay_risk_agent: demo.delay_risk_agent === true,
+        invalid_agent_output: demo.invalid_agent_output === true,
+      },
+      { weights, parentTaskId },
+    )
     // 202 Accepted: the work continues in the background; follow it on the stream.
     return HttpResponse.json({ task_id: task.task_id, trace_id: task.trace_id, status: task.status }, { status: 202 })
   }),
@@ -146,6 +238,18 @@ export const aiHandlers = [
       decided_datetime: new Date().toISOString(),
     })
   }),
+
+  // ----- Self-improvement (spec 7.5.4): admin only, checked by the auth gate -----
+  http.get('*/ai/feedback', async () => {
+    await delay(MOCK_DELAY_MS)
+    return HttpResponse.json({ items: feedbackItems() })
+  }),
+  http.get('*/ai/versions', async () => {
+    await delay(MOCK_DELAY_MS)
+    return HttpResponse.json(versionsResponse())
+  }),
+  http.post('*/ai/versions/:versionId/promote', ({ params, request }) => switchVersion(request, String(params.versionId), 'promote')),
+  http.post('*/ai/versions/:versionId/rollback', ({ params, request }) => switchVersion(request, String(params.versionId), 'rollback')),
 
   http.post('*/ai/tasks/:taskId/reject', async ({ params, request }) => {
     await delay(MOCK_DELAY_MS)

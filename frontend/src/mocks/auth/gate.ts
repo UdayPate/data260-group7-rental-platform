@@ -13,6 +13,7 @@ import type { Role, TokenClaims } from '../../types/auth'
 import { getTaskEntry } from '../ai/bus'
 import { db } from '../db'
 import { errorResponse, readBody } from '../responses'
+import { syncReady } from '../sync'
 import { verifyToken } from './jwt'
 
 type Request = { body: Record<string, unknown>; query: URLSearchParams; path: string }
@@ -111,6 +112,9 @@ const RULES: Rule[] = [
     },
   },
   { method: 'POST', path: /\/ai\/tasks\/[^/]+\/(approve|reject)$/, roles: ['guest'], own: ['guest_id'] },
+  // Self-improvement: feedback, versions, promote / roll back (spec 7.5.4)
+  { method: 'GET', path: /\/ai\/(feedback|versions)$/, roles: ['admin'] },
+  { method: 'POST', path: /\/ai\/versions\/[^/]+\/(promote|rollback)$/, roles: ['admin'] },
 
   // ----- Analytics & Logging Service -----
   { method: 'POST', path: /\/events\/ingest$/, roles: ANYONE_LOGGED_IN },
@@ -145,6 +149,8 @@ const isPageLoad = (request: globalThis.Request) =>
 
 export const authGate = http.all('*', async ({ request }) => {
   if (isPageLoad(request)) return
+  // A window that just opened first takes the current data from the other windows (mocks/sync.ts).
+  await syncReady
   const url = new URL(request.url)
   const rule = RULES.find((r) => r.method === request.method && r.path.test(url.pathname))
   if (!rule) return // not an API endpoint we mock: let the other handlers decide
@@ -184,6 +190,15 @@ export const authGate = http.all('*', async ({ request }) => {
   if (refused) return errorResponse('UNAUTHORIZED', refused)
   // Allowed: returning nothing lets the endpoint's handler answer.
 })
+
+// Who sent this (already checked) request; null if no valid token. Used by handlers that
+// record the caller, e.g. who promoted a matcher version.
+export async function requestClaims(request: globalThis.Request): Promise<TokenClaims | null> {
+  const token = bearerToken(request)
+  if (!token) return null
+  const verified = await verifyToken(token)
+  return verified.ok ? verified.claims : null
+}
 
 // Same check for WebSockets, where the token comes in "?token=" (browsers can't set
 // headers on a WebSocket). Returns the claims, or null if the socket must be closed with 4401.

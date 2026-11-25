@@ -3,12 +3,13 @@
 // With the trace_id of a debate, everything narrows to that debate (C3a).
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, LabelList, Legend, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts'
 import { AGENT_LABELS } from '../../agents'
 import { getAiDashboard } from '../../api/analytics'
 import { errorMessage } from '../../api/client'
 import { axisProps, BAR_RADIUS_RIGHT, BAR_RADIUS_UP, gridProps, legendProps, seriesColor, themeColor, tooltipProps } from '../../components/dashboards/chartTheme'
 import { ChartCard, DashboardFrame, KpiTile } from '../../components/dashboards/DashboardParts'
+import VersionsPanel from '../../components/dashboards/VersionsPanel'
 import { readDashboardFilters } from '../../dashboardFilters'
 import { AGENTS, type AgentId } from '../../types/ai'
 import type { AiDashboard } from '../../types/analytics'
@@ -172,6 +173,27 @@ function AiCharts({ data }: { data: AiDashboard }) {
           </ResponsiveContainer>
         </ChartCard>
 
+        {/* Mean rank can't share the 0-1 axis above, so it gets its own chart (spec 7.3.1). */}
+        <ChartCard
+          title="Mean rank of the human top choice (lower is better)"
+          source={data.sources.evaluation}
+          wide
+          height={220}
+          table={{ columns: ['Configuration', 'Mean rank'], rows: data.evaluation.map((e) => [e.configuration, e.mean_rank]) }}
+        >
+          <ResponsiveContainer>
+            <BarChart data={data.evaluation} layout="vertical" margin={{ top: 4, right: 40, left: 24, bottom: 0 }}>
+              <CartesianGrid {...gridProps()} horizontal={false} vertical />
+              <XAxis type="number" domain={[0, 'dataMax']} {...axisProps()} />
+              <YAxis type="category" dataKey="configuration" width={190} {...axisProps()} />
+              <Tooltip {...tooltipProps()} />
+              <Bar dataKey="mean_rank" name="Mean rank" fill={seriesColor(2)} radius={BAR_RADIUS_RIGHT} maxBarSize={20}>
+                <LabelList dataKey="mean_rank" position="right" fill={themeColor('fg-soft')} fontSize={12} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
         <ChartCard
           title="Human approval categories"
           source={data.sources.approvals}
@@ -190,6 +212,8 @@ function AiCharts({ data }: { data: AiDashboard }) {
           </ResponsiveContainer>
         </ChartCard>
       </div>
+
+      <VersionsPanel />
     </div>
   )
 }

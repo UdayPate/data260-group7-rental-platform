@@ -4,11 +4,26 @@
 //
 // Agents:
 //   Parser     - reads city, guests, budget, amenities, rating out of the text
-//   Matcher    - fit + price, plus a small review-count ("popularity") term the Fairness Auditor flags
+//   Matcher    - weighted score of amenity fit, price, rating, risk penalty and review count
+//                (weights from the active matcher version, or the guest's own on a rerun);
+//                listings that miss a must-have always rank below those that don't
 //   Risk       - fit + host trust, minus host-caused cancellations
 //   Fairness   - fit + price + rating only (ignores popularity and host history)
 //   Chair      - finds disagreement, always challenges the Fairness Auditor (spec 7.2), counts votes
-import type { AgentId, AiResult, DemoOptions, EventPayloads, EventType, ParsedRequirements, Plan, RankedProperty } from '../../types/ai'
+import type {
+  AgentId,
+  AiResult,
+  DemoOptions,
+  EventPayloads,
+  EventType,
+  MatcherRankEntry,
+  MatcherWeights,
+  ParsedRequirements,
+  Plan,
+  RankedProperty,
+  WeightKey,
+} from '../../types/ai'
+import { WEIGHT_KEYS } from '../../types/ai'
 import type { Amenity, Property, PropertyType } from '../../types/property'
 import { daysFromToday, nightsBetween, rangesOverlap } from '../dates'
 import { db } from '../db'
@@ -128,17 +143,65 @@ function priceBonus(p: Property, req: ParsedRequirements) {
 const ratingNorm = (p: Property) => clamp(p.rating - 4)
 const popularity = (p: Property) => clamp(p.review_count / 60)
 
-type Scored = { p: Property; score: number; reasons: string[] }
+type Scored = { p: Property; score: number; reasons: string[]; mustHaves?: boolean; parts?: Record<WeightKey, number> }
 
-// Each agent's scoring rule. `withPopularity` lets the Fairness Auditor rerun the Matcher without it.
-function matcherScore(p: Property, req: ParsedRequirements, withPopularity = true): Scored {
+// 0-1: how risky the host looks (the Risk agent's warning signs, as a number).
+function riskPart(p: Property): number {
+  const host = db.hosts.find((h) => h.host_id === p.host_id)
+  let r = hostCancellations(p.host_id).length > 0 ? 0.6 : 0
+  if (host && host.response_rate < 80) r += 0.25
+  if (host && host.verification_status !== 'verified') r += 0.15
+  return clamp(r)
+}
+
+// The Matcher's measured parts for one listing, each 0-1 (no weights yet).
+function matcherParts(p: Property, req: ParsedRequirements) {
   const f = fitOf(p, req)
-  const score = 0.7 * f.fit + 0.2 * priceBonus(p, req) + (withPopularity ? 0.05 * popularity(p) : 0)
+  const wanted = req.amenities.length
+  const parts: Record<WeightKey, number> = {
+    amenity_fit: wanted === 0 ? 1 : req.amenities.filter((a) => p.amenities.includes(a)).length / wanted,
+    price: priceBonus(p, req),
+    rating: ratingNorm(p),
+    risk_penalty: riskPart(p),
+    review_count: popularity(p),
+  }
+  // Must-haves are every requirement except amenities (amenities are a weight).
+  const mustHaves = f.failed.every((x) => x.startsWith('has '))
+  return { f, parts, mustHaves }
+}
+
+// Weighted sum divided by the sum of the weights (team decision W2a); risk is subtracted.
+export function weightedScore(parts: Record<WeightKey, number>, w: MatcherWeights): number {
+  const total = WEIGHT_KEYS.reduce((sum, k) => sum + w[k], 0)
+  if (total === 0) return 0
+  const plus = w.amenity_fit * parts.amenity_fit + w.price * parts.price + w.rating * parts.rating + w.review_count * parts.review_count
+  return clamp((plus - w.risk_penalty * parts.risk_penalty) / total)
+}
+
+function matcherScore(p: Property, req: ParsedRequirements, w: MatcherWeights): Scored {
+  const { f, parts, mustHaves } = matcherParts(p, req)
   const reasons = [`meets ${f.passed.length} of ${f.passed.length + f.failed.length} requirements`, `$${p.nightly_price}/night`]
   if (f.failed.length > 0) reasons.push(`misses: ${f.failed.join(', ')}`)
-  if (withPopularity) reasons.push(`${p.review_count} reviews`)
-  return { p, score, reasons }
+  if (w.review_count > 0) reasons.push(`${p.review_count} reviews`)
+  if (w.risk_penalty > 0 && parts.risk_penalty > 0) reasons.push('host risk counted')
+  return { p, score: weightedScore(parts, w), reasons, mustHaves, parts }
 }
+
+// The Matcher's order: listings meeting every must-have first, then by score, then by price.
+function rankMatcher(pool: Property[], req: ParsedRequirements, w: MatcherWeights): Scored[] {
+  return pool
+    .map((p) => matcherScore(p, req, w))
+    .sort((a, b) => Number(b.mustHaves) - Number(a.mustHaves) || b.score - a.score || a.p.nightly_price - b.p.nightly_price)
+}
+
+const toRankEntry = (s: Scored, i: number): MatcherRankEntry => ({
+  rank: i + 1,
+  property_id: s.p.property_id,
+  title: s.p.title,
+  score: round2(s.score),
+  meets_must_haves: s.mustHaves ?? true,
+  parts: Object.fromEntries(WEIGHT_KEYS.map((k) => [k, round2(s.parts![k])])) as Record<WeightKey, number>,
+})
 
 function riskScore(p: Property, req: ParsedRequirements): Scored {
   const f = fitOf(p, req)
@@ -211,7 +274,10 @@ function makePlan(planId: string, traceId: string): Plan {
 
 export type DebateScript = { timeline: TimelineItem[]; result: AiResult; requirements: ParsedRequirements; plan: Plan }
 
-export function planDebate(taskId: string, traceId: string, planId: string, text: string, demo: DemoOptions): DebateScript {
+// What the Matcher runs with: the version id and its weights (or the guest's own weights).
+export type MatcherSetup = { version: string; weights: MatcherWeights; parentTaskId: string | null }
+
+export function planDebate(taskId: string, traceId: string, planId: string, text: string, demo: DemoOptions, setup: MatcherSetup): DebateScript {
   const items: TimelineItem[] = []
   const add = <T extends EventType>(at: number, actor: string, type: T, payload: EventPayloads[T]) =>
     items.push({ at, actor, type, payload })
@@ -239,6 +305,10 @@ export function planDebate(taskId: string, traceId: string, planId: string, text
     check_out: req.check_out,
     guest_count: req.guest_count,
     human_decision: null,
+    matcher_version: setup.version,
+    weights: setup.weights,
+    parent_task_id: setup.parentTaskId,
+    matcher_ranking: [] as MatcherRankEntry[],
     created_datetime: '', // filled when published
   }
 
@@ -269,7 +339,7 @@ export function planDebate(taskId: string, traceId: string, planId: string, text
   }
 
   // ----- Round 0: independent opinions -----
-  const matcher = rank(pool, (p) => matcherScore(p, req))
+  const matcher = rankMatcher(pool, req, setup.weights)
   const risk = rank(pool, (p) => riskScore(p, req))
   const fairness = rank(pool, (p) => fairnessScore(p, req))
   const picks: Record<'matcher' | 'risk' | 'fairness', Property> = { matcher: matcher[0].p, risk: risk[0].p, fairness: fairness[0].p }
@@ -294,7 +364,7 @@ export function planDebate(taskId: string, traceId: string, planId: string, text
     round: 0,
     ranked: matcher.slice(0, 5).map(toRanked),
     confidence: confidenceOf(matcher),
-    reasoning: `${picks.matcher.title} meets the most requirements at the lowest price ($${picks.matcher.nightly_price}/night).`,
+    reasoning: `${picks.matcher.title} has the highest score under the Matcher’s weights (${round2(matcher[0].score)}): it meets ${fitOf(picks.matcher, req).passed.length} requirement(s) at $${picks.matcher.nightly_price}/night.`,
   })
   add(7000, 'fairness', 'opinion.published', {
     round: 0,
@@ -403,7 +473,7 @@ export function planDebate(taskId: string, traceId: string, planId: string, text
   add(round2Start, 'chair', 'round.started', { round: 2, deadline_ms: ROUND_DEADLINE_MS, waiting_for: ['matcher', 'fairness', 'risk'] })
 
   // Fairness finding: rerun the Matcher without the review-count term.
-  const withoutPopularity = rank(pool, (p) => matcherScore(p, req, false))
+  const withoutPopularity = rankMatcher(pool, req, { ...setup.weights, review_count: 0 })
   const moved = withoutPopularity
     .slice(0, 5)
     .map((s, i) => ({ s, before: matcher.findIndex((m) => m.p.property_id === s.p.property_id), after: i }))
@@ -434,7 +504,7 @@ export function planDebate(taskId: string, traceId: string, planId: string, text
       [`nightly_price ${picks.matcher.property_id}: $${picks.matcher.nightly_price}`, `nightly_price ${picks.risk.property_id}: $${picks.risk.nightly_price}`],
     )
   }
-  cast('matcher', 'keep', picks.matcher.property_id, 'Lowest price among listings that meet every requirement.')
+  cast('matcher', 'keep', picks.matcher.property_id, 'Highest score under the Matcher’s weights among listings that meet every must-have.')
 
   // Fairness
   const fairnessPickFlags = riskFlags(picks.fairness)
@@ -522,6 +592,7 @@ export function planDebate(taskId: string, traceId: string, planId: string, text
   const top5 = [winner, ...matcher.map((m) => m.p).filter((p) => p.property_id !== winnerId)].slice(0, 5)
   const result: AiResult = {
     ...baseResult,
+    matcher_ranking: matcher.slice(0, 10).map(toRankEntry),
     recommended: toResultProperty(matcher.find((m) => m.p.property_id === winnerId)!),
     ranked: top5.map((p) => toResultProperty(matcher.find((m) => m.p.property_id === p.property_id)!)),
     confidence: round2(clamp((tally.get(winnerId)! / votes.reduce((s, v) => s + v.weight, 0)) * 0.9, 0.4, 0.95)),

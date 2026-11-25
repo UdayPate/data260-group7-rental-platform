@@ -15,7 +15,9 @@ import {
   VoteList,
   WaitingCard,
 } from '../../components/ai/DebateParts'
+import { RerunPanel, RunComparison } from '../../components/ai/Reweighting'
 import VerdictCard from '../../components/ai/VerdictCard'
+import { describeWeights } from '../../aiWeights'
 import ErrorBanner from '../../components/ErrorBanner'
 import { useCurrentUser } from '../../context/useCurrentUser'
 import { formatDate } from '../../dates'
@@ -100,6 +102,19 @@ function AiDebate({ taskId }: { taskId: string }) {
             Demo failure modes on: {[task.demo.delay_risk_agent && 'Risk agent delayed', task.demo.invalid_agent_output && 'one invalid agent output'].filter(Boolean).join(', ')}
           </p>
         )}
+        {/* Which Matcher this debate used (spec 7.5.4) and its weights (spec 13.6) */}
+        <p data-matcher className="text-sm text-fg-muted">
+          Matcher <span className="font-mono text-fg-soft">{task.matcher_version}</span>
+          {task.parent_task_id && ' with custom weights'} · {describeWeights(task.weights)}
+          {task.parent_task_id && (
+            <>
+              {' '}· rerun of{' '}
+              <Link to={`/ai/tasks/${task.parent_task_id}`} className="font-mono text-primary hover:underline">
+                {task.parent_task_id}
+              </Link>
+            </>
+          )}
+        </p>
         {foreign > 0 && <p className="text-sm text-status-error">Dropped {foreign} event(s) that belonged to another trace.</p>}
       </div>
 
@@ -172,6 +187,10 @@ function AiDebate({ taskId }: { taskId: string }) {
           ) : (
             status !== 'failed' && <p className="text-sm text-fg-muted">The verdict appears here when the chair finishes.</p>
           )}
+
+          {/* Spec 13.6: compare with the original run, and rerun with other weights */}
+          {result && task.parent_task_id && <RunComparison parentTaskId={task.parent_task_id} rerun={result} />}
+          {result && canAct && result.recommended && <RerunPanel task={task} guestId={guestId} />}
         </div>
 
         {/* ---------- Side column ---------- */}

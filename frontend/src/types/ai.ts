@@ -28,6 +28,26 @@ export type DemoOptions = {
   invalid_agent_output: boolean // one agent output fails the harness check -> agent.output_rejected
 }
 
+// ---------- Matcher weights and versions (spec 13.6, 7.5.4) ----------
+
+// What the Matcher's score is made of. Each part is a measured value from 0 to 1.
+export const WEIGHT_KEYS = ['amenity_fit', 'price', 'rating', 'risk_penalty', 'review_count'] as const
+export type WeightKey = (typeof WEIGHT_KEYS)[number]
+
+// How much each part counts, 0-1 each (team decision W2a). The score is the weighted sum
+// divided by the sum of the weights; risk_penalty is subtracted instead of added.
+export type MatcherWeights = Record<WeightKey, number>
+
+// One candidate in the Matcher's own ranking: measured numbers only, no generated text.
+export type MatcherRankEntry = {
+  rank: number // 1 = best
+  property_id: string
+  title: string
+  score: number // 0-1, from the weights and parts
+  meets_must_haves: boolean // guests, dates, budget, type, minimum rating; false = ranked below all that do
+  parts: Record<WeightKey, number> // each 0-1, before weighting
+}
+
 export type PlanStepStatus = 'pending' | 'in_progress' | 'done' | 'skipped' | 'failed'
 
 export type PlanStep = {
@@ -70,6 +90,9 @@ export type AiTask = {
   demo: DemoOptions
   plan: Plan | null
   requirements: ParsedRequirements | null
+  matcher_version: string // e.g. "matcher-v1": the version active when the task started
+  weights: MatcherWeights // the weights the Matcher used (the version's, or the guest's own on a rerun)
+  parent_task_id: string | null // set on a rerun: the task it was rerun from
   created_datetime: string
   updated_datetime: string
   error: string | null
@@ -182,12 +205,22 @@ export type AiResult = {
   check_out: string | null
   guest_count: number | null
   human_decision: HumanDecision | null
+  matcher_version: string
+  weights: MatcherWeights
+  parent_task_id: string | null
+  matcher_ranking: MatcherRankEntry[] // the Matcher's top 10 (measured), for comparing runs
   created_datetime: string
 }
 
 // ---------- Request / response bodies ----------
 
-export type CreateAiRequest = { guest_id: string; request_text: string; demo?: Partial<DemoOptions> }
+export type CreateAiRequest = {
+  guest_id: string
+  request_text: string
+  demo?: Partial<DemoOptions>
+  weights?: MatcherWeights // optional: rerun with these weights instead of the active version's
+  parent_task_id?: string // optional: the task this one reruns (must be the same guest's)
+}
 export type CreateAiResponse = { task_id: string; trace_id: string; status: TaskStatus }
 export type GetAiTaskResponse = { task: AiTask; events: StreamEvent[] }
 
@@ -197,3 +230,53 @@ export type ApproveAiRequest = {
   reason?: string
 }
 export type RejectAiRequest = { guest_id: string; reason: string }
+
+// ---------- Self-improvement: feedback and versions (spec 7.5.4, 7.5.5) ----------
+
+export type FeedbackItem = {
+  feedback_id: string
+  trace_id: string
+  task_id: string
+  guest_id: string
+  recommended_property_id: string | null
+  recommended_title: string | null
+  decision: HumanDecision['decision']
+  reason: string | null
+  decided_datetime: string
+  sample: boolean // true = a labelled sample entry, not a real decision
+  outcome: 'led_to_version' | 'rejected' | null // what the team did with it
+  outcome_version: string | null // e.g. "matcher-v2" when it led to a version
+  outcome_reason: string | null // why it led to a change, or why it was rejected
+}
+
+export type VersionEvaluation = {
+  precision_at_10: number
+  recall_at_10: number
+  mean_rank: number // of the human top choice; lower is better
+  avg_latency_ms: number
+}
+
+export type MatcherVersion = {
+  version_id: string // "matcher-v1"
+  change: string // what changed compared with the previous version
+  weights: MatcherWeights
+  based_on_feedback_ids: string[]
+  evaluation: VersionEvaluation
+  created_datetime: string
+}
+
+export type VersionHistoryEntry = {
+  action: 'promote' | 'rollback'
+  version_id: string // the version made active
+  by_id: string // admin id
+  by_name: string
+  at: string // datetime
+}
+
+export type VersionsResponse = {
+  active_version_id: string
+  versions: MatcherVersion[]
+  baseline: { name: string } & VersionEvaluation // the filter-count baseline, for comparison
+  history: VersionHistoryEntry[]
+  evaluation_sample: boolean // true while the evaluation numbers are sample values
+}
