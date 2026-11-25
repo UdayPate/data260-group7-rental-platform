@@ -48,10 +48,12 @@ function Header() {
   // The role in the token decides everything (no Guest/Host toggle any more).
   const navItems = user ? NAV[user.role] : publicNav
   const onSearchPage = pathname === '/search'
-  // Not on the log in / sign up pages (nothing to search there), and not on the
-  // logged-out home page, whose hero has its own search bar.
+  // Guests and logged-out visitors get it everywhere; hosts and the admin only on /search
+  // (they may browse stays there). Never on the log in / sign up pages (nothing to search
+  // there) or the logged-out home page, whose hero has its own search bar.
   const onHomePage = pathname === '/' && !user
-  const showSearchBar = (!user || user.role === 'guest') && !['/login', '/signup'].includes(pathname) && !onHomePage
+  const showSearchBar =
+    (!user || user.role === 'guest' || onSearchPage) && !['/login', '/signup'].includes(pathname) && !onHomePage
 
   return (
     <header className="border-b border-line bg-bg">
