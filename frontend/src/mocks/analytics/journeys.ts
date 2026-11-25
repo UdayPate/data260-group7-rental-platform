@@ -29,12 +29,19 @@ function bookingSteps(r: Reservation): TraceStep[] {
     steps.push({ trace_id: r.trace_id, event_type: eventType, service, timestamp: time, latency_ms: latency, status, error })
   }
 
-  add('booking-service', 'POST /bookings/request', 30 + (jitter % 25))
+  add('booking-service', 'POST /bookings/request → 202 processing', 30 + (jitter % 25))
   add('kafka', 'booking.requested', 4 + (jitter % 6))
+  // Async booking: the worker hasn't taken it yet (e.g. paused for the 13.2 demo).
+  if (r.status === 'processing') return steps
   if (r.reservation_id === RETRY_DEMO_RESERVATION) {
     add('booking-worker', 'booking.requested consumed', 2000, 'retried', 'MySQL deadlock on availability row; retrying after 2 s backoff')
   }
-  add('booking-worker', 'booking.requested consumed → MySQL write', 35 + (jitter % 30))
+  if (r.status === 'failed') {
+    // The worker's atomic hold failed: no dates held, nothing for the host.
+    add('booking-worker', 'booking.requested consumed → hold refused', 30 + (jitter % 20), 'failed', `${r.failure_code}: ${r.cancellation_reason}`)
+    return steps
+  }
+  add('booking-worker', 'booking.requested consumed → dates held, status pending', 35 + (jitter % 30))
   add('property-service', 'availability.blocked (WebSocket push to viewers)', 8 + (jitter % 9))
 
   // Later steps happen hours or days after the request (the host's decision, check-out, a review).

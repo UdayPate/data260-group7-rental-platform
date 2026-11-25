@@ -14,11 +14,13 @@ import type { GuestDashboard } from '../../types/analytics'
 
 // Reservation statuses use the status tokens; each bar is also labelled on the axis.
 const STATUS_TOKEN: Record<string, string> = {
+  processing: 'fg-muted',
   pending: 'status-pending',
   approved: 'status-ok',
   completed: 'olive',
   declined: 'status-error',
   cancelled: 'status-error',
+  failed: 'status-error',
 }
 
 function GuestDashboardPage() {

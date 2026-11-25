@@ -1,5 +1,7 @@
 // One reservation's status (guest): status badge with an explanation, the stay details,
 // the price breakdown, a Refresh button (D8a) and a Cancel button (D7a).
+// A new request starts as "processing" (async booking, B1a–B6a): the page checks it every
+// second until the booking worker has made it "pending" or "failed" (B5a).
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router'
 import { cancelBooking, getBooking, newIdempotencyKey } from '../../api/bookings'
@@ -23,6 +25,10 @@ function ReservationStatusPage() {
 // What each status means for the guest.
 function statusExplanation(reservation: Reservation): string {
   switch (reservation.status) {
+    case 'processing':
+      return 'Processing… We’re checking that these dates are still free and holding them for you.'
+    case 'failed':
+      return 'This request couldn’t be booked, so no dates are held and nothing was sent to the host.'
     case 'pending':
       return 'Waiting for the host to respond. Your dates are held until then.'
     case 'approved':
@@ -37,6 +43,10 @@ function statusExplanation(reservation: Reservation): string {
 }
 
 type Props = { reservationId: string; guestId: string }
+
+const POLL_MS = 1000 // check a "processing" request every second…
+const SLOW_AFTER_MS = 15000 // …and after 15 s say it's taking long and check every 5 s
+const SLOW_POLL_MS = 5000
 
 function ReservationStatus({ reservationId, guestId }: Props) {
   const location = useLocation()
@@ -55,6 +65,37 @@ function ReservationStatus({ reservationId, guestId }: Props) {
   const [cancelKey, setCancelKey] = useState('') // one idempotency key per confirm box, reused on retry
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
+
+  // While the request is "processing", ask again until the booking worker has decided (B5a).
+  const processing = reservation?.status === 'processing'
+  const [slow, setSlow] = useState(false) // processing for over 15 s
+  const [pollError, setPollError] = useState<string | null>(null)
+  useEffect(() => {
+    if (!processing) return
+    const started = Date.now()
+    let stopped = false
+    let timer: ReturnType<typeof setTimeout>
+    async function check() {
+      const tookLong = Date.now() - started > SLOW_AFTER_MS
+      if (tookLong) setSlow(true)
+      try {
+        const latest = await getBooking({ reservation_id: reservationId })
+        if (stopped) return
+        setPollError(null)
+        setReservation(latest)
+        if (latest.status !== 'processing') return // decided: stop checking
+      } catch (err) {
+        if (stopped) return
+        setPollError(errorMessage(err)) // shown under the status; keep trying
+      }
+      timer = setTimeout(check, tookLong ? SLOW_POLL_MS : POLL_MS)
+    }
+    timer = setTimeout(check, POLL_MS)
+    return () => {
+      stopped = true
+      clearTimeout(timer)
+    }
+  }, [processing, reservationId])
 
   useEffect(() => {
     let ignore = false
@@ -162,6 +203,36 @@ function ReservationStatus({ reservationId, guestId }: Props) {
           Request sent! The host will approve or decline it.
         </div>
       )}
+      {reservation.status === 'processing' && (
+        <div data-processing className="rounded-2xl border border-line-strong bg-surface px-4 py-3" role="status">
+          <p className="font-semibold text-fg">Processing your request…</p>
+          {slow && (
+            <p className="mt-1 text-sm text-fg-soft">
+              Still processing: the booking service is busy or paused. We’ll keep checking.
+            </p>
+          )}
+          {pollError && <p className="mt-1 text-sm text-status-error">Couldn’t check the status: {pollError} Still trying.</p>}
+        </div>
+      )}
+      {reservation.status === 'failed' && (
+        // The worker's reason, e.g. "Some of these dates are no longer available…" (B2a).
+        <div data-failed className="rounded-2xl border border-status-error-border bg-surface px-4 py-3" role="alert">
+          <p className="text-status-error">{reservation.cancellation_reason ?? 'This request couldn’t be booked.'}</p>
+          {reservation.failure_code === 'DUPLICATE_BOOKING' ? (
+            // You already hold these nights with another request: show it among your trips.
+            <Link to="/guest/trips" className="mt-2 inline-block font-semibold text-primary hover:underline">
+              See your existing request in My trips →
+            </Link>
+          ) : (
+            <Link
+              to={`/properties/${reservation.property_id}?guests=${reservation.guest_count}`}
+              className="mt-2 inline-block font-semibold text-primary hover:underline"
+            >
+              Pick other dates →
+            </Link>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
@@ -169,7 +240,7 @@ function ReservationStatus({ reservationId, guestId }: Props) {
           <StatusBadge status={reservation.status} />
         </div>
         <p className="text-fg-soft">{statusExplanation(reservation)}</p>
-        {reservation.cancellation_reason && (
+        {reservation.cancellation_reason && reservation.status !== 'failed' && (
           <p className="text-sm text-fg-muted">Reason: {reservation.cancellation_reason}</p>
         )}
         <p className="font-mono text-sm text-fg-muted">

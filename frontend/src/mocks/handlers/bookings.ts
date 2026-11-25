@@ -4,12 +4,15 @@
 //  - only the listing's host approves/declines, and only while pending
 //  - the guest cancels pending/approved before check-in; the host cancels approved before check-in, with a reason
 //  - the same idempotency_key twice returns the first result instead of acting twice
+//  - a request is async: 202 "processing", then the worker (mocks/bookingWorker.ts) makes it
+//    "pending" (dates held) or "failed" (DATE_CONFLICT / DUPLICATE_BOOKING)
 import { delay, http, HttpResponse } from 'msw'
 import type { AvailabilityChangeReason } from '../../types/availability'
 import type { Reservation, ReservationStatus } from '../../types/reservation'
 import { publishAvailability } from '../availability/bus'
-import { isValidDate, nowDatetime, rangesOverlap, today } from '../dates'
-import { db, hasDateConflict, holdsDates, nextId, priceBreakdown } from '../db'
+import { enqueueBookingRequest, queuedCount, setWorkerPaused, workerState } from '../bookingWorker'
+import { isValidDate, nowDatetime, today } from '../dates'
+import { db, holdsDates, nextId, priceBreakdown } from '../db'
 import { errorResponse, invalidJsonResponse, MOCK_DELAY_MS, readBody, requireFields } from '../responses'
 
 const reservationNotFound = (id: unknown) => errorResponse('NOT_FOUND', `No reservation found with id ${String(id)}.`)
@@ -35,7 +38,7 @@ function releaseDates(reservation: Reservation, reason: AvailabilityChangeReason
 const hostOf = (reservation: Reservation) =>
   db.properties.find((p) => p.property_id === reservation.property_id)?.host_id
 
-const STATUSES: ReservationStatus[] = ['pending', 'approved', 'declined', 'cancelled', 'completed']
+const STATUSES: ReservationStatus[] = ['processing', 'pending', 'approved', 'declined', 'cancelled', 'completed', 'failed']
 
 export const bookingHandlers = [
   http.post('*/bookings/request', async ({ request }) => {
@@ -70,23 +73,9 @@ export const bookingHandlers = [
       return errorResponse('VALIDATION_ERROR', `This place fits at most ${property.capacity} guest(s).`)
     }
 
-    // Same guest already has an active request for these dates (sent with a different key).
-    const duplicate = db.reservations.find(
-      (r) =>
-        r.guest_id === guest.guest_id &&
-        r.property_id === property.property_id &&
-        holdsDates(r) &&
-        rangesOverlap(r.check_in, r.check_out, check_in, check_out),
-    )
-    if (duplicate) {
-      return errorResponse('DUPLICATE_BOOKING', 'You already have a request for these dates at this place.', {
-        reservation_id: duplicate.reservation_id,
-      })
-    }
-    if (hasDateConflict(property.property_id, check_in, check_out)) {
-      return errorResponse('DATE_CONFLICT', 'Some of these dates are no longer available. Please pick other dates.')
-    }
-
+    // Async booking (team decisions B1a–B6a): the checks above answer at once; the duplicate
+    // and date checks need the database's atomic hold, so the booking worker does them.
+    // The reservation starts as "processing"; the worker moves it to "pending" or "failed".
     const reservation: Reservation = {
       reservation_id: nextId('r', db.reservations.map((r) => r.reservation_id)),
       trace_id: crypto.randomUUID(), // starts this booking's journey (C2a)
@@ -97,30 +86,18 @@ export const bookingHandlers = [
       guest_count: body.guest_count as number,
       price_breakdown: priceBreakdown(property, check_in, check_out),
       booking_datetime: nowDatetime(),
-      status: 'pending',
+      status: 'processing',
       cancellation_reason: null,
+      failure_code: null,
       guest_message: typeof body.guest_message === 'string' && body.guest_message !== '' ? body.guest_message : null,
     }
     db.reservations.push(reservation)
-
-    // Hold the dates (pending requests block them too).
-    const block = {
-      availability_id: nextId('a', db.availability.map((a) => a.availability_id)),
-      property_id: property.property_id,
-      start_date: check_in,
-      end_date: check_out,
-      status: 'booked' as const,
-      source: 'booking' as const,
-      updated_datetime: reservation.booking_datetime,
-    }
-    db.availability.push(block)
-    db.bookingBlockIds.set(reservation.reservation_id, block.availability_id)
-    // Live update for everyone viewing this property (spec 13.4), in this booking's journey.
-    publishAvailability('availability.blocked', block, 'booking_requested', reservation.trace_id)
     db.idempotencyKeys.set(String(body.idempotency_key), reservation.reservation_id)
     guest.booking_count += 1
+    // "Publish booking.requested": the mock worker picks it up after a short delay.
+    enqueueBookingRequest(reservation.reservation_id)
 
-    return HttpResponse.json(reservation, { status: 201 })
+    return HttpResponse.json(reservation, { status: 202 })
   }),
 
   http.post('*/bookings/get', async ({ request }) => {
@@ -145,8 +122,13 @@ export const bookingHandlers = [
     if (!db.properties.some((p) => p.property_id === body.property_id)) {
       return errorResponse('NOT_FOUND', `No property found with id ${String(body.property_id)}.`)
     }
+    // The host only sees requests the booking worker accepted: never "processing" or "failed" (B4a).
     const items = db.reservations.filter(
-      (r) => r.property_id === body.property_id && (body.status === undefined || r.status === body.status),
+      (r) =>
+        r.property_id === body.property_id &&
+        r.status !== 'processing' &&
+        r.status !== 'failed' &&
+        (body.status === undefined || r.status === body.status),
     )
     return HttpResponse.json({ items })
   }),
@@ -240,6 +222,9 @@ export const bookingHandlers = [
       if (reservation.guest_id !== body.guest_id) {
         return errorResponse('UNAUTHORIZED', 'You can only cancel your own reservations.')
       }
+      if (reservation.status === 'processing') {
+        return errorResponse('INVALID_STATUS', 'This request is still being processed. Try again in a moment.')
+      }
       if (!holdsDates(reservation)) {
         return errorResponse('INVALID_STATUS', `This reservation is already ${reservation.status}, so it can’t be cancelled.`)
       }
@@ -261,5 +246,18 @@ export const bookingHandlers = [
     releaseDates(reservation, 'booking_cancelled')
     db.idempotencyKeys.set(String(body.idempotency_key), reservation.reservation_id)
     return HttpResponse.json(reservation)
+  }),
+
+  // ---------- Mock-only demo control (no such endpoint in the real Booking Service) ----------
+  // "Pause the booking worker" for the spec 13.2 demo. With the real backend you stop the
+  // worker process instead (docker compose stop booking-worker).
+  http.get('*/__mock/booking-worker', () =>
+    HttpResponse.json({ paused: workerState.paused, queued_here: queuedCount(), processing: db.reservations.filter((r) => r.status === 'processing').length }),
+  ),
+  http.post('*/__mock/booking-worker', async ({ request }) => {
+    const body = await readBody(request)
+    if (!body || typeof body.paused !== 'boolean') return errorResponse('VALIDATION_ERROR', 'Send { "paused": true } or { "paused": false }.')
+    setWorkerPaused(body.paused)
+    return HttpResponse.json({ paused: workerState.paused, queued_here: queuedCount(), processing: db.reservations.filter((r) => r.status === 'processing').length })
   }),
 ]

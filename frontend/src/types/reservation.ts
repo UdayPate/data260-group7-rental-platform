@@ -1,4 +1,9 @@
-export type ReservationStatus = 'pending' | 'approved' | 'declined' | 'cancelled' | 'completed'
+// "processing" = accepted by the API, waiting for the booking worker (Kafka); the worker moves it
+// to "pending" (dates held) or "failed" (see failure_code). Async booking, team decisions B1a–B6a.
+export type ReservationStatus = 'processing' | 'pending' | 'approved' | 'declined' | 'cancelled' | 'completed' | 'failed'
+
+// Why the booking worker couldn't hold the dates (only set when status is "failed").
+export type BookingFailureCode = 'DATE_CONFLICT' | 'DUPLICATE_BOOKING'
 
 export type PriceBreakdown = {
   nights: number
@@ -20,7 +25,8 @@ export type Reservation = {
   price_breakdown: PriceBreakdown
   booking_datetime: string
   status: ReservationStatus
-  cancellation_reason: string | null
+  cancellation_reason: string | null // also the readable reason when status is "failed"
+  failure_code: BookingFailureCode | null // set only when status is "failed"
   guest_message: string | null
 }
 

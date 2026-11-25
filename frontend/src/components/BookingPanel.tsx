@@ -2,9 +2,9 @@
 // message, a price preview, and the request itself (POST /bookings/request).
 // The dates live in the page (the calendar shows them too), so they come in as props.
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import { newIdempotencyKey, requestBooking } from '../api/bookings'
-import { ApiError, errorMessage } from '../api/client'
+import { errorMessage } from '../api/client'
 import { stayHasUnavailableNight } from '../availability'
 import { clockTime, localDate, nightsBetween } from '../dates'
 import { AVAILABILITY_REASON_TEXT, formatPrice, plural } from '../labels'
@@ -27,9 +27,6 @@ type Props = {
   liveClash: LiveUpdate | undefined
 }
 
-// What went wrong with the last request, kept with its code so we can add a link
-// for DUPLICATE_BOOKING.
-type RequestError = { message: string; code?: string; reservationId?: string }
 
 const labelClass = 'font-condensed text-xs font-bold tracking-[0.08em] text-fg-muted uppercase'
 const inputClass =
@@ -40,7 +37,7 @@ function BookingPanel(props: Props) {
   const navigate = useNavigate()
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<RequestError | null>(null)
+  const [error, setError] = useState<string | null>(null)
   // The idempotency key of the last attempt, and the form values it was for.
   // Retrying with the same values reuses the key, so the server can't create the booking twice.
   const [lastAttempt, setLastAttempt] = useState<{ values: string; key: string } | null>(null)
@@ -48,8 +45,9 @@ function BookingPanel(props: Props) {
   const datesPicked = checkIn !== '' && checkOut !== ''
   const nights = datesPicked ? nightsBetween(checkIn, checkOut) : 0
   const subtotal = nights * property.nightly_price
-  // Any picked night that is taken blocks the request (team decision R4a). The server's
-  // 409 DATE_CONFLICT stays as the backstop if a request still gets through.
+  // Any picked night that is taken blocks the request (team decision R4a). If a request still
+  // gets through (e.g. two guests at the same moment), the booking worker marks it "failed"
+  // with DATE_CONFLICT and the reservation page says so (async booking, B1a–B6a).
   const looksUnavailable = datesPicked && stayHasUnavailableNight(blocks, checkIn, checkOut)
   const inactive = property.status !== 'active'
 
@@ -82,15 +80,11 @@ function BookingPanel(props: Props) {
         guest_message: message.trim() || undefined,
         idempotency_key: key,
       })
-      // Success: show the new reservation's status page, with a "Request sent" note.
+      // Accepted (202, "processing"): the status page waits for the booking worker and then
+      // shows "Request sent" or the reason it could not be booked.
       navigate(`/guest/trips/${reservation.reservation_id}`, { state: { justRequested: true } })
     } catch (err) {
-      const apiError = err instanceof ApiError ? err : null
-      setError({
-        message: errorMessage(err),
-        code: apiError?.code,
-        reservationId: typeof apiError?.details?.reservation_id === 'string' ? apiError.details.reservation_id : undefined,
-      })
+      setError(errorMessage(err))
       setSubmitting(false)
     }
   }
@@ -189,13 +183,7 @@ function BookingPanel(props: Props) {
       )}
 
       {error && (
-        <ErrorBanner message={error.message} onDismiss={() => setError(null)}>
-          {error.code === 'DUPLICATE_BOOKING' && error.reservationId && (
-            <Link to={`/guest/trips/${error.reservationId}`} className="mt-1 inline-block text-sm font-semibold text-primary hover:underline">
-              View your existing request
-            </Link>
-          )}
-        </ErrorBanner>
+        <ErrorBanner message={error} onDismiss={() => setError(null)} />
       )}
 
       <button

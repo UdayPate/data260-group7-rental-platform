@@ -14,6 +14,7 @@
 // The real backend doesn't need any of this: there, all users share one database.
 import { localTaskEntries, setTaskChangeListener, storeOtherWindowEntry, type TaskEntry } from './ai/bus'
 import { state as versionState } from './ai/versions'
+import { workerState, workerStateChanged } from './bookingWorker'
 import { db } from './db'
 
 const SNAPSHOT_WAIT_MS = 500
@@ -46,8 +47,8 @@ const ingestKeys = () => db.ingestKeys
 type ListOps = { upserts: Row[]; deletes: string[] }
 type Message =
   | { type: 'hello'; from: string }
-  | { type: 'snapshot'; to: string; lists: Record<string, Row[]>; maps: Record<string, [string, string][]>; ingestKeys: string[]; versions: typeof versionState; tasks: TaskEntry[] }
-  | { type: 'ops'; lists: Record<string, ListOps>; maps: Record<string, [string, string][]>; ingestKeys: string[]; versions: typeof versionState | null }
+  | { type: 'snapshot'; to: string; lists: Record<string, Row[]>; maps: Record<string, [string, string][]>; ingestKeys: string[]; versions: typeof versionState; worker: typeof workerState; tasks: TaskEntry[] }
+  | { type: 'ops'; lists: Record<string, ListOps>; maps: Record<string, [string, string][]>; ingestKeys: string[]; versions: typeof versionState | null; worker: typeof workerState | null }
   | { type: 'task'; entry: TaskEntry }
 
 const windowId = typeof crypto !== 'undefined' ? crypto.randomUUID() : 'node'
@@ -57,6 +58,7 @@ const channel = typeof window === 'undefined' ? null : new BroadcastChannel('xen
 const lastSeen = new Map<string, Map<string, string>>()
 let lastMaps = new Map<string, string>() // "<map>|<key>" -> value
 let lastVersions = ''
+let lastWorker = ''
 
 function remember() {
   for (const [name, keyOf] of Object.entries(LISTS)) {
@@ -65,6 +67,7 @@ function remember() {
   lastMaps = new Map(MAPS.flatMap((m) => [...maps[m].entries()].map(([k, v]) => [`${m}|${k}`, v] as [string, string])))
   for (const k of ingestKeys()) lastMaps.set(`ingestKeys|${k}`, '1')
   lastVersions = JSON.stringify(versionState)
+  lastWorker = JSON.stringify(workerState)
 }
 
 // Called after every mocked request: broadcast what changed since last time.
@@ -86,10 +89,12 @@ export function shareChanges() {
   const newIngestKeys = [...ingestKeys()].filter((k) => !lastMaps.has(`ingestKeys|${k}`))
   const versionsJson = JSON.stringify(versionState)
   const versions = versionsJson !== lastVersions ? versionState : null
+  // The booking worker's paused/running switch (mocks/bookingWorker.ts).
+  const worker = JSON.stringify(workerState) !== lastWorker ? workerState : null
 
-  if (Object.keys(changed).length === 0 && Object.keys(changedMaps).length === 0 && newIngestKeys.length === 0 && !versions) return
+  if (Object.keys(changed).length === 0 && Object.keys(changedMaps).length === 0 && newIngestKeys.length === 0 && !versions && !worker) return
   remember()
-  channel.postMessage({ type: 'ops', lists: changed, maps: changedMaps, ingestKeys: newIngestKeys, versions } satisfies Message)
+  channel.postMessage({ type: 'ops', lists: changed, maps: changedMaps, ingestKeys: newIngestKeys, versions, worker } satisfies Message)
 }
 
 // Apply another window's changes in place (other code keeps references to these lists).
@@ -110,7 +115,9 @@ function applyOps(msg: Extract<Message, { type: 'ops' }>) {
   for (const [m, entries] of Object.entries(msg.maps)) for (const [k, v] of entries) maps[m].set(k, v)
   for (const k of msg.ingestKeys) ingestKeys().add(k)
   if (msg.versions) Object.assign(versionState, structuredClone(msg.versions))
+  if (msg.worker) Object.assign(workerState, msg.worker)
   remember()
+  if (msg.worker) workerStateChanged() // paused or resumed in another window
 }
 
 // A newer window adopts the snapshot of an open one.
@@ -123,8 +130,10 @@ function applySnapshot(msg: Extract<Message, { type: 'snapshot' }>) {
   ingestKeys().clear()
   for (const k of msg.ingestKeys) ingestKeys().add(k)
   Object.assign(versionState, structuredClone(msg.versions))
+  Object.assign(workerState, msg.worker)
   for (const entry of msg.tasks) storeOtherWindowEntry(entry)
   remember()
+  workerStateChanged()
 }
 
 function snapshot(to: string): Message {
@@ -135,6 +144,7 @@ function snapshot(to: string): Message {
     maps: Object.fromEntries(MAPS.map((m) => [m, [...maps[m].entries()]])),
     ingestKeys: [...ingestKeys()],
     versions: versionState,
+    worker: workerState,
     tasks: localTaskEntries(),
   }
 }

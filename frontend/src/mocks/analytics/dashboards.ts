@@ -94,7 +94,7 @@ export function guestDashboard(guestId: string, days: number): GuestDashboard {
     const date = daysFromToday(-(days - 1 - i))
     return { date, count: mine.filter((r) => r.booking_datetime.slice(0, 10) === date).length }
   })
-  const statuses = ['pending', 'approved', 'completed', 'declined', 'cancelled']
+  const statuses = ['processing', 'pending', 'approved', 'completed', 'declined', 'cancelled', 'failed']
   const status_summary = statuses.map((status) => ({ status, count: mine.filter((r) => r.status === status).length }))
 
   const weeks = Math.ceil(days / 7)
@@ -140,7 +140,8 @@ export function hostDashboard(hostId: string, days: number): HostDashboard {
   const allListings = db.properties.filter((p) => p.host_id === hostId)
   const active = allListings.filter((p) => p.status === 'active')
   const ids = allListings.map((p) => p.property_id)
-  const theirs = db.reservations.filter((r) => ids.includes(r.property_id))
+  // The host only sees requests the booking worker accepted (not "processing" or "failed", B4a).
+  const theirs = db.reservations.filter((r) => ids.includes(r.property_id) && r.status !== 'processing' && r.status !== 'failed')
 
   // Funnel: views (UI events + a sample baseline), saves, requests, approved.
   const realViews = db.uiEvents.filter(

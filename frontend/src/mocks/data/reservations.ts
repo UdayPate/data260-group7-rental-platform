@@ -3,7 +3,7 @@ import { daysAgoDatetime, daysFromToday } from '../dates'
 
 // Seed reservations without price_breakdown or trace_id: db.ts calculates the price from the
 // property's price, so the numbers can never disagree with the listing.
-export type SeedReservation = Omit<Reservation, 'price_breakdown' | 'trace_id'>
+export type SeedReservation = Omit<Reservation, 'price_breakdown' | 'trace_id' | 'failure_code'>
 
 // 24 reservations covering every status. Dates are relative to today
 // (daysFromToday(10) = 10 days from now; negative = in the past).

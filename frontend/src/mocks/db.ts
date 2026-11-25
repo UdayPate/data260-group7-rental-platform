@@ -58,7 +58,7 @@ const reservations: Reservation[] = [...seedReservations, ...pastStayReservation
   // A fixed, UUID-shaped trace_id per seed reservation ("r_002" -> "5eed0000-…-000000000002"), so every
   // browser window starts with the same ids (mocks/sync.ts). New reservations get random ones.
   const traceId = `5eed0000-0000-4000-8000-${seed.reservation_id.replace(/\D/g, '').padStart(12, '0')}`
-  return { ...seed, trace_id: traceId, price_breakdown: priceBreakdown(property, seed.check_in, seed.check_out) }
+  return { ...seed, trace_id: traceId, failure_code: null, price_breakdown: priceBreakdown(property, seed.check_in, seed.check_out) }
 })
 
 // Guests' counters are counted from the data, not typed in, so they always match.

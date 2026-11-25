@@ -27,7 +27,7 @@ Covered so far: **User**, **Property**, **Booking**, **Messaging**, **Review**, 
 | Stay dates | `check_out` / `end_date` are **exclusive**: the guest leaves that day. Check-in 12-04 to check-out 12-06 = 2 nights (the 4th and 5th). Two stays overlap only if `a_start < b_end && b_start < a_end`, so back-to-back stays (one checks out the day the next checks in) are allowed. |
 | Nullable fields | Sent as `null`, never left out |
 | Who is acting | Every call sends `Authorization: Bearer <JWT>` (see **Authentication and roles** below). The acting user's ID is **also** still sent in the body (`guest_id` / `host_id`, unchanged), and the service checks that it matches the token. |
-| Success status | `201` for create and `bookings/request`, `200` for everything else |
+| Success status | `201` for create, `202` for `bookings/request` (async), `200` for everything else |
 
 ---
 
@@ -298,7 +298,8 @@ Any block whose status is not `"available"` makes those nights unavailable.
 | price_breakdown | object | see below; calculated by the server at request time |
 | booking_datetime | datetime | when the request was made |
 | status | ReservationStatus | see rules in section 5 |
-| cancellation_reason | string\|null | also holds the host's decline reason |
+| cancellation_reason | string\|null | also holds the host's decline reason, and the readable reason when `status` is `"failed"` |
+| failure_code | `"DATE_CONFLICT"` \| `"DUPLICATE_BOOKING"` \| null | **new (async booking):** why the booking worker couldn't hold the dates; set only when `status` is `"failed"` |
 | guest_message | string\|null | optional note from the guest |
 
 `price_breakdown`:
@@ -310,7 +311,10 @@ Any block whose status is not `"available"` makes those nights unavailable.
 | cleaning_fee | number | the property's cleaning fee |
 | total | number | subtotal + cleaning_fee (no taxes or service fee) |
 
-**ReservationStatus** = `"pending"`, `"approved"`, `"declined"`, `"cancelled"`, `"completed"`
+**ReservationStatus** = `"processing"`, `"pending"`, `"approved"`, `"declined"`, `"cancelled"`, `"completed"`, `"failed"`
+
+- `processing` (**new**): the API accepted the request and published `booking.requested`; the booking worker hasn't decided yet. No dates are held.
+- `failed` (**new**): the worker couldn't hold the dates (`failure_code` says why, `cancellation_reason` says it in words). No dates held, nothing sent to the host. The UI shows it as "Not booked".
 
 ### Thread (Messaging Service), "conversation" in spec §4
 | Field | Type |
@@ -496,7 +500,7 @@ When to send (Kafka → Property Service → sockets):
 
 | Change | event_type | reason |
 |---|---|---|
-| Booking request created (pending requests hold dates, booking rule 1) | `availability.blocked` | `booking_requested` |
+| The booking worker held the dates (request moved from `processing` to `pending`, booking rule 1). Nothing is sent for a `failed` request | `availability.blocked` | `booking_requested` |
 | Request declined, or expired by the daily job before check-in* | `availability.released` | `booking_declined` |
 | Reservation cancelled (by guest or host) | `availability.released` | `booking_cancelled` |
 | Host blocks / unblocks dates | `availability.blocked` / `availability.released` | `host_blocked` / `host_unblocked` |
@@ -516,10 +520,10 @@ machines and the demo laptop keep their clocks in sync (NTP), because it compare
 
 | Endpoint | Request body | Response |
 |---|---|---|
-| `POST /bookings/request` | `{ "property_id", "guest_id", "check_in", "check_out", "guest_count", "guest_message"?, "idempotency_key" }` | `201` Reservation with status `pending` (or `200` with the original if the key was already used) |
+| `POST /bookings/request` | `{ "property_id", "guest_id", "check_in", "check_out", "guest_count", "guest_message"?, "idempotency_key" }` | **`202`** Reservation with status **`processing`** (async, see §5 rule 8). The same `idempotency_key` again returns the original reservation with `200`, whatever its status now. |
 | `POST /bookings/get` | `{ "reservation_id" }` | Reservation |
-| `POST /bookings/byProperty` | `{ "property_id", "status"? }` | `{ "items": Reservation[] }` |
-| `POST /bookings/byGuest` | `{ "guest_id", "status"? }` | `{ "items": Reservation[] }` |
+| `POST /bookings/byProperty` | `{ "property_id", "status"? }` | `{ "items": Reservation[] }`, **without** `processing` and `failed` reservations (the host only sees requests the worker accepted) |
+| `POST /bookings/byGuest` | `{ "guest_id", "status"? }` | `{ "items": Reservation[] }`, every status including `processing` and `failed` |
 | `POST /bookings/approve` | `{ "reservation_id", "host_id", "idempotency_key" }` | updated Reservation |
 | `POST /bookings/decline` | `{ "reservation_id", "host_id", "reason"?, "idempotency_key" }` | updated Reservation (reason saved in `cancellation_reason`) |
 | `POST /bookings/cancel` | `{ "reservation_id", "guest_id" **or** "host_id", "cancellation_reason", "idempotency_key" }`: send exactly one of guest_id / host_id | updated Reservation |
@@ -646,11 +650,12 @@ Kafka, the consumer's MySQL write (including retries), the availability push, th
 
 ## 5. Booking rules (team decisions)
 
-1. **Pending and approved reservations hold their dates.** When a request is created, the
-   service adds a `booked` / `booking` availability block for its dates. Declining or
+1. **Pending and approved reservations hold their dates.** When the booking worker accepts a
+   request (`processing` → `pending`), it adds a `booked` / `booking` availability block for its dates.
+   A `processing` or `failed` reservation holds nothing. Declining or
    cancelling removes that block. Approving keeps it. **Every add or remove is pushed live to
    everyone viewing the property** (WebSocket `/properties/{property_id}/availability/stream`, spec §13.4).
-2. **Request validation, in order:**
+2. **Request validation, in order.** The API answers these at once (synchronous):
    - All required fields → `400`
    - Repeated `idempotency_key` → return the original reservation, `200`
    - Valid dates, check-in not in the past, check-out after check-in → `400`
@@ -659,8 +664,13 @@ Kafka, the consumer's MySQL write (including retries), the availability push, th
    - Property is `active` → `409 INVALID_STATUS`
    - Guest exists → `404`
    - `guest_count` ≤ capacity → `400`
-   - Same guest, same property, overlapping active request → `409 DUPLICATE_BOOKING`
-   - Any blocked or booked overlap → `409 DATE_CONFLICT`
+
+   Then `202` `processing`. The **booking worker** makes the last two checks, because they need the
+   database's atomic hold (rule 7), and records a failure on the reservation instead of an HTTP error:
+   - Same guest, same property, overlapping `pending` or `approved` request → `failed`, `failure_code: "DUPLICATE_BOOKING"`
+   - Any blocked or booked overlap → `failed`, `failure_code: "DATE_CONFLICT"`, `cancellation_reason`
+     "Some of these dates are no longer available. Please pick other dates."
+   - Otherwise → `pending`, dates held.
 3. **Approve / decline:** only the property's host (`host_id` must own the property, else
    `403`), and only while `pending` (else `409 INVALID_STATUS`).
 4. **Cancel:**
@@ -671,7 +681,8 @@ Kafka, the consumer's MySQL write (including retries), the availability push, th
 5. **Idempotency** (spec §10): every request, approve, decline and cancel carries an
    `idempotency_key` (the frontend sends a random UUID per user action and reuses it on retry).
    If the same key arrives again, return the result of the first call with `200` and change nothing.
-6. **Status transitions:** `pending → approved | declined | cancelled`, `approved → cancelled | completed`.
+6. **Status transitions:** `processing → pending | failed` (the worker), `pending → approved | declined | cancelled`, `approved → cancelled | completed`.
+   A `processing` reservation can't be approved, declined or cancelled yet (`409 INVALID_STATUS`).
    `completed` is set after check-out (by a backend job; the frontend never sets it).
    **The Booking Service must run this job:** e.g. once a day, every `approved` reservation whose
    `check_out` is today or earlier becomes `completed` (with a `booking.completed` Kafka event).
@@ -680,9 +691,17 @@ Kafka, the consumer's MySQL write (including retries), the availability push, th
    The same job **expires stale requests**: every `pending` reservation whose `check_in` date has
    passed becomes `declined` with `cancellation_reason` "Expired: the host didn’t respond before
    check-in." and its dates are released (team decision M2a). The mock runs this job before every API call.
-7. **Double booking (spec §13.1):** the "no overlap" check in rule 2 must be enforced by the
+7. **Double booking (spec §13.1):** the worker's "no overlap" check must be enforced by the
    database or a transaction, not only by a read-then-write in code, so two simultaneous
    requests can't both succeed. The mocks don't do this for you.
+8. **Async booking (spec 3.1, 6.1, 13.2).** `POST /bookings/request` saves the reservation as
+   `processing`, publishes `booking.requested` (key = `property_id`, with the reservation's
+   `trace_id`) and returns `202`. The booking worker consumes it and, in **one database transaction**,
+   checks, holds the dates (or records the failure), writes the status change and its idempotency
+   record, and only then commits the Kafka offset. If the worker is stopped, requests stay
+   `processing` and are processed when it restarts, each exactly once (spec 13.2). The UI polls
+   `/bookings/get` every second while a reservation is `processing` (every 5 s after 15 s, with a
+   "still processing" note) and then shows the result or the failure reason.
 
 ---
 

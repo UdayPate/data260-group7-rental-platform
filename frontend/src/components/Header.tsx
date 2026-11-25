@@ -5,6 +5,7 @@ import { mocksEnabled } from '../config'
 import type { Role } from '../types/auth'
 import BrandLogo from './BrandLogo'
 import FilterStrip from './FilterStrip'
+import MockMenu from './MockMenu'
 import HostFilterStrip from './HostFilterStrip'
 import SearchBar from './SearchBar'
 import UnreadBadge from './UnreadBadge'
@@ -82,11 +83,8 @@ function Header() {
         </nav>
 
         <div className="ml-auto flex items-center gap-4">
-          {mocksEnabled && (
-            <span className="rounded-full border border-status-pending px-3 py-0.5 font-condensed text-xs font-bold tracking-[0.08em] whitespace-nowrap text-status-pending uppercase">
-              Mock data
-            </span>
-          )}
+          {/* "Mock data" badge with the demo menu (booking worker switch) */}
+          {mocksEnabled && <MockMenu />}
 
           {user ? (
             <>

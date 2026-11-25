@@ -29,8 +29,10 @@ const TABS: { id: Tab; label: string }[] = [
 
 // Which tab a reservation belongs in.
 function tabOf(r: Reservation): TripTab {
-  if (r.status === 'cancelled' || r.status === 'declined') return 'cancelled'
-  if ((r.status === 'pending' || r.status === 'approved') && r.check_out > localDate()) return 'upcoming'
+  // "failed" = the booking worker couldn't hold the dates; shown as "Not booked" (B4a).
+  if (r.status === 'cancelled' || r.status === 'declined' || r.status === 'failed') return 'cancelled'
+  // "processing" = still waiting for the booking worker; it's an upcoming request.
+  if ((r.status === 'processing' || r.status === 'pending' || r.status === 'approved') && r.check_out > localDate()) return 'upcoming'
   return 'past' // completed, or approved and already over
 }
 
