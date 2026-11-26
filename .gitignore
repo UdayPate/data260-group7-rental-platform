@@ -226,3 +226,6 @@ __marimo__/
 node_modules/
 .env.*
 !.env.example
+
+# evidence scripts
+tests/evidence/**/worker.log

@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xenia-property-service"
+version = "0.1.0"
+description = "Xenia Property Service: listings, search, saves, availability, live availability WebSocket, Redis cache."
+requires-python = ">=3.11"
+dependencies = ["xenia-shared"]
+
+[tool.setuptools.packages.find]
+include = ["property_service*"]
