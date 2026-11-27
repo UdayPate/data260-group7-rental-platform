@@ -229,3 +229,4 @@ node_modules/
 
 # evidence scripts
 tests/evidence/**/worker.log
+logs/
