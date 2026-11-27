@@ -29,6 +29,12 @@ Use the same Python for the scripts (`PYTHON=.venv/bin/python tests/evidence/<na
 | `redis/run.sh` | 13.9 | search (MISS) -> same search (HIT) -> Maya changes the price -> search (MISS, new price) -> timings -> cost of the invalidation -> `docker compose stop redis` -> search still `200` -> start Redis -> price restored. | the order MISS, HIT, MISS(new price), HIT; search answers `200` with Redis stopped |
 | `consumer-recovery/run.sh` | 13.2 | Starts and stops the booking worker itself. Stop worker -> request (`202`, stays `processing`) -> `kafka-consumer-groups --describe --group booking-workers` shows **lag 1** -> start worker -> lag **0**, reservation `pending` -> sends the same event again. Worker output goes to `consumer-recovery/worker.log`. | lag 1 then 0; one reservation for the `trace_id`, one set of held nights, one `processed_events` row; the repeated event changes nothing |
 
+| `three-debates/run.sh` | 13.11 | Alex, Sam and Emily start three different requests at the same instant. Prints per-task event counts by round (from `ai_events`), each recommendation against its own candidate pool, and the Kafka partition each `trace_id` key went to. | all three finish; no event of one task carries another task's `trace_id`/`task_id`; `seq` has no gaps; key = `trace_id`, one partition per debate |
+| `agent-timeout/run.sh` | 13.10 | The spec request normally, then with `delay_risk_agent`. Prints the `agent.timed_out` event and its deadline, `missing_agents`, `dissent_note`, and the latency of both runs. | risk times out in round 2 after the deadline (not forever); the debate still finishes; risk is listed as missing; its late answer is not counted |
+| `invalid-agent-output/run.sh` | 7.5.5 | The spec request with `invalid_agent_output`. Prints the `agent.output_rejected` event and the plan note. | one rejection (matcher, round 0, retry) naming `ranked[0].property_id` and `ranked[0].score`; a valid Matcher opinion after it; nobody missing |
+
+The three AI scripts also need the AI service (8007) and its agents running (`services/ai-service/README.md`).
+
 Both `redis` and `consumer-recovery` use `docker`. If Docker is not available the Redis script says `SKIPPED` for the
 "Redis stopped" part and you do that step by hand.
 

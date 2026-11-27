@@ -6,6 +6,7 @@
     errors    the { "error": { code, message, details } } response format
     app       create_app(): FastAPI with CORS, the error handlers and /health
     db        MySQL connection pool, transactions, id generation
+    mongo     MongoDB connection (get_mongo), for reviews, messages and AI debates (added by Himja)
     trace     emit_step(): journey steps for the dashboard (spec 8)
     config    reading settings from environment variables
 """

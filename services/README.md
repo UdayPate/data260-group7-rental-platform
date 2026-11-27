@@ -6,6 +6,9 @@
 | Property Service | 8002 | `uvicorn property_service.main:app --port 8002` |
 | Booking API | 8003 | `uvicorn booking_service.main:app --port 8003` |
 | Booking worker | (none) | `python -m booking_service.worker` (consumes `booking.requested`, also runs the daily job) |
+| Messaging Service (Himja) | 8004 | `uvicorn messaging_service.main:app --port 8004` |
+| Review Service (Himja) | 8005 | `uvicorn review_service.main:app --port 8005` |
+| AI Agent Service (Himja) | 8007 | `uvicorn ai_service.main:app --port 8007` + `python -m ai_service.workers <agent>` (see `ai-service/README.md`) |
 
 Shared code lives in `../shared` (`xenia_shared`): Kafka envelope + publish/consume, JWT check, error format, database helpers, Redis cache, availability holding.
 
