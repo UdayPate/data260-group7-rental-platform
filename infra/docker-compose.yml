@@ -1,0 +1,119 @@
+# Xenia infrastructure (spec 3.1 three tiers, 6.1 Kafka, 3.2 databases, 13.9 Redis).
+#
+#   docker compose up -d        start everything (first start also creates the tables and seed data)
+#   docker compose ps           all four should say "healthy"
+#   docker compose down -v      stop AND delete the data (the next "up" starts from the seed again)
+#
+# Run it from this folder (infra/). The services themselves (User, Property, Booking...) run on
+# your laptop with uvicorn and connect to these four through localhost.
+name: xenia
+
+services:
+  # ---- Kafka (KRaft mode: no ZooKeeper needed) ----
+  # Two listeners, because the same broker is reached two ways:
+  #   kafka:19092      from other containers (e.g. kafka-init below)
+  #   localhost:9092   from services running on the laptop
+  # If only the Docker-internal address were advertised, a service on the laptop could connect to
+  # the broker but then be told "talk to kafka:19092", which does not exist outside Docker.
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: xenia-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      CLUSTER_ID: "xenia-local-cluster-0001"      # any fixed 22-character-ish id; KRaft needs one
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:19092,HOST://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # Topics are created by create-topics.sh with 3 partitions each. Auto-creation is OFF,
+      # otherwise a typo'd topic silently appears with 1 partition and hides the partition and
+      # consumer-group behaviour the spec asks us to demonstrate (13.11).
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+
+  # One-shot helper: waits for Kafka to be healthy, creates every topic, then exits.
+  kafka-init:
+    image: apache/kafka:3.8.0
+    container_name: xenia-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      BOOTSTRAP: kafka:19092
+    volumes:
+      - ./kafka/create-topics.sh:/create-topics.sh:ro
+    entrypoint: ["/bin/bash", "/create-topics.sh"]
+    restart: "no"
+
+  # ---- MySQL 8: transactional data ----
+  mysql:
+    image: mysql:8.0
+    container_name: xenia-mysql
+    command: ["--default-time-zone=+00:00", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--max-connections=500"]
+    ports:
+      - "${MYSQL_HOST_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-xenia}
+      MYSQL_USER: ${MYSQL_USER:-xenia}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-xenia}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # *.sql files here run once, in file-name order, the first time the volume is empty:
+      # 01_schema.sql -> 02_users.sql -> 03_seed.sql
+      - ./mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # ---- MongoDB: flexible documents (reviews, messages, debates, traces) ----
+  mongo:
+    image: mongo:7
+    container_name: xenia-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - ./mongo:/docker-entrypoint-initdb.d:ro      # init.js runs once on an empty volume
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ---- Redis: search and availability cache ----
+  redis:
+    image: redis:7-alpine
+    container_name: xenia-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  kafka-data:
+  mysql-data:
+  mongo-data:

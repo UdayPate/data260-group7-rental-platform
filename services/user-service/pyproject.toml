@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xenia-user-service"
+version = "0.1.0"
+description = "Xenia User Service: sign-up, login (JWT), guests and hosts."
+requires-python = ">=3.11"
+dependencies = ["xenia-shared"]
+
+[tool.setuptools.packages.find]
+include = ["user_service*"]
