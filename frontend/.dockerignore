@@ -1,0 +1,6 @@
+# Not needed to build the frontend image.
+node_modules
+dist
+.env
+.env.*
+public/photos/originals

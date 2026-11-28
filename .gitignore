@@ -230,3 +230,6 @@ node_modules/
 # evidence scripts
 tests/evidence/**/worker.log
 logs/
+
+# JWT secret made by docker-compose.yml (jwt-secret service) on first start. Never commit.
+.secrets/

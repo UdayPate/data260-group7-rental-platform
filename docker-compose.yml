@@ -1,0 +1,302 @@
+# Xenia: the WHOLE app in Docker. The only thing you need is Docker Desktop.
+#
+#   docker compose up -d --build      start everything (first time: builds the images, creates the
+#                                     tables, loads the seed data, makes a JWT secret). Then open
+#                                     http://localhost:5173
+#   docker compose down               stop everything (the data is kept)
+#   docker compose down -v            stop AND delete the data; the next "up" starts from the seed
+#   docker compose stop booking-worker / docker compose start booking-worker   (spec 13.2 demo)
+#
+# Only the browser-facing ports are published: 5173 (frontend) and 8001-8005, 8007 (the services the
+# browser calls). MySQL, Kafka, MongoDB and Redis stay inside Docker, so nothing clashes with other
+# software on your machine. To reach them from your laptop (evidence scripts, a database client), add
+# the ports file:  docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d
+#
+# The infrastructure part is the same as infra/docker-compose.yml (which still works on its own for the
+# "services in a virtualenv" way of running). The two use the same container names (xenia-kafka...),
+# so run one stack at a time: `docker compose down` the other one first.
+name: xenia-app
+
+# Settings every Python service shares (YAML anchors: written once, used below).
+x-python-service: &python-service
+  restart: unless-stopped
+  volumes:
+    - ./.secrets:/run/secrets/xenia:ro   # the JWT secret made by jwt-secret (see infra/docker/with-secret.sh)
+  depends_on:
+    jwt-secret:
+      condition: service_completed_successfully
+    mysql:
+      condition: service_healthy
+    kafka-init:
+      condition: service_completed_successfully
+    mongo:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+x-common-env: &common-env
+  CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+  KAFKA_BOOTSTRAP: kafka:19092
+  MYSQL_HOST: mysql
+  MYSQL_PORT: "3306"
+  MYSQL_USER: xenia
+  MYSQL_PASSWORD: xenia
+  MYSQL_DATABASE: xenia
+  REDIS_URL: redis://redis:6379/0
+  MONGO_URL: mongodb://mongo:27017
+  MONGO_DATABASE: xenia
+  USER_API_BASE_URL: http://user-service:8001
+  PROPERTY_API_BASE_URL: http://property-service:8002
+  BOOKING_API_BASE_URL: http://booking-service:8003
+
+x-ai-env: &ai-env
+  <<: *common-env
+  MYSQL_USER: ai_reader          # SELECT-only: the agents can read listings but never change them
+  MYSQL_PASSWORD: ai_reader_dev
+  ANTHROPIC_API_KEY: ""          # empty = rule-based parser and template explanations, no paid model calls
+  AI_MODE: full
+  SEMANTIC_CACHE: "on"
+
+# "Am I up?" check for a Python service: GET /health on its own port.
+x-health: &health
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 20s
+
+services:
+  # ---------------------------------------------------------------- secrets
+  # One-shot: makes a random JWT secret the first time (in .secrets/jwt_secret, git-ignored) and
+  # keeps it after that, so logins survive a restart. Never the frontend mock's public dev secret.
+  jwt-secret:
+    image: alpine:3.20
+    container_name: xenia-jwt-secret
+    volumes:
+      - ./.secrets:/secrets
+    command:
+      - sh
+      - -c
+      - |
+        if [ -s /secrets/jwt_secret ]; then echo "JWT secret: reusing .secrets/jwt_secret"; exit 0; fi
+        head -c 48 /dev/urandom | base64 | tr -d '\n/+=' > /secrets/jwt_secret
+        echo "JWT secret: made a new random one in .secrets/jwt_secret"
+    restart: "no"
+
+  # ---------------------------------------------------------------- infrastructure (no host ports)
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: xenia-kafka
+    environment:
+      CLUSTER_ID: "xenia-local-cluster-0001"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:19092,HOST://:9092,CONTROLLER://:9093
+      # INTERNAL: from the other containers. HOST: only used with docker-compose.ports.yml.
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"   # topics come from create-topics.sh (3 partitions each)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  kafka-init:   # one-shot: creates every topic (safe to run again), then exits
+    image: apache/kafka:3.8.0
+    container_name: xenia-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      BOOTSTRAP: kafka:19092
+    volumes:
+      - ./infra/kafka/create-topics.sh:/create-topics.sh:ro
+    entrypoint: ["/bin/bash", "/create-topics.sh"]
+    restart: "no"
+
+  mysql:
+    image: mysql:8.0
+    container_name: xenia-mysql
+    command: ["--default-time-zone=+00:00", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--max-connections=500"]
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: xenia
+      MYSQL_USER: xenia
+      MYSQL_PASSWORD: xenia
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # On an EMPTY volume these run once, in order: tables, users (ai_reader), seed data.
+      - ./infra/mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    container_name: xenia-mongo
+    volumes:
+      - mongo-data:/data/db
+      - ./infra/mongo:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: xenia-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- Tanya's services
+  user-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/user-service/Dockerfile }
+    image: xenia/user-service
+    container_name: xenia-user-service
+    environment: *common-env
+    ports: ["8001:8001"]
+    healthcheck: { <<: *health, test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"] }
+
+  property-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/property-service/Dockerfile }
+    image: xenia/property-service
+    container_name: xenia-property-service
+    environment:
+      <<: *common-env
+      SEARCH_CACHE: "on"
+      RUN_CONSUMERS: "on"            # live availability (WebSocket) and rating consumers
+    ports: ["8002:8002"]
+    healthcheck: { <<: *health, test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"] }
+
+  booking-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/booking-service/Dockerfile }
+    image: xenia/booking-service
+    container_name: xenia-booking-service
+    environment:
+      <<: *common-env
+      USE_KAFKA: "on"
+    ports: ["8003:8003"]
+    healthcheck: { <<: *health, test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"] }
+
+  # The Kafka consumer that holds the dates (spec 3.1). Same image, different command.
+  # Spec 13.2 demo: docker compose stop booking-worker, book, docker compose start booking-worker.
+  booking-worker:
+    <<: *python-service
+    image: xenia/booking-service     # the image booking-service builds (never downloaded)
+    pull_policy: never
+    container_name: xenia-booking-worker
+    environment: *common-env
+    command: ["python", "-m", "booking_service.worker"]
+
+  # ---------------------------------------------------------------- Himja's services
+  messaging-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/messaging-service/Dockerfile }
+    image: xenia/messaging-service
+    container_name: xenia-messaging-service
+    environment:
+      <<: *common-env
+      SEED_ON_START: "on"            # loads the mock's conversations into an empty MongoDB
+    ports: ["8004:8004"]
+    healthcheck: { <<: *health, test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"] }
+
+  review-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/review-service/Dockerfile }
+    image: xenia/review-service
+    container_name: xenia-review-service
+    environment:
+      <<: *common-env
+      SEED_ON_START: "on"            # loads the mock's reviews into an empty MongoDB
+    ports: ["8005:8005"]
+    healthcheck: { <<: *health, test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"] }
+
+  ai-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/ai-service/Dockerfile }
+    image: xenia/ai-service
+    container_name: xenia-ai-service
+    environment: *ai-env
+    ports: ["8007:8007"]
+    healthcheck: { <<: *health, test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8007/health')"] }
+
+  # The six agents: separate processes that talk only through Kafka (spec 7.2). Same image.
+  ai-chair: &agent
+    <<: *python-service
+    image: xenia/ai-service          # the image ai-service builds (never downloaded)
+    pull_policy: never
+    container_name: xenia-ai-chair
+    environment: *ai-env
+    command: ["python", "-m", "ai_service.workers", "chair"]
+  ai-parser:
+    <<: *agent
+    container_name: xenia-ai-parser
+    command: ["python", "-m", "ai_service.workers", "parser"]
+  ai-matcher:
+    <<: *agent
+    container_name: xenia-ai-matcher
+    command: ["python", "-m", "ai_service.workers", "matcher"]
+  ai-risk:
+    <<: *agent
+    container_name: xenia-ai-risk
+    command: ["python", "-m", "ai_service.workers", "risk"]
+  ai-fairness:
+    <<: *agent
+    container_name: xenia-ai-fairness
+    command: ["python", "-m", "ai_service.workers", "fairness"]
+  ai-explanation:
+    <<: *agent
+    container_name: xenia-ai-explanation
+    command: ["python", "-m", "ai_service.workers", "explanation"]
+
+  # ---------------------------------------------------------------- frontend
+  frontend:
+    build:
+      context: ./frontend
+      args:                          # the browser calls these (published below); Analytics stays mocked
+        VITE_USE_MOCKS: "true"
+        VITE_USER_API_BASE_URL: http://localhost:8001
+        VITE_PROPERTY_API_BASE_URL: http://localhost:8002
+        VITE_BOOKING_API_BASE_URL: http://localhost:8003
+        VITE_MESSAGING_API_BASE_URL: http://localhost:8004
+        VITE_REVIEW_API_BASE_URL: http://localhost:8005
+        VITE_AI_API_BASE_URL: http://localhost:8007
+    image: xenia/frontend
+    container_name: xenia-frontend
+    ports: ["5173:5173"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+volumes:
+  kafka-data:
+  mysql-data:
+  mongo-data:

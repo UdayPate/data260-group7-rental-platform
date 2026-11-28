@@ -20,6 +20,21 @@ Use the same Python for the scripts (`PYTHON=.venv/bin/python tests/evidence/<na
 (and `redis` for the Redis script), which `pip install -e shared` already gives you. MySQL settings come from the
 `MYSQL_*` variables (defaults: the Docker MySQL, user `xenia`).
 
+**With the all-in-Docker stack** (`docker-compose.yml` at the repo root) instead of the services on your laptop:
+start it with the ports file, so the scripts can reach MySQL and Kafka, and tell them MySQL is on 3307:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d --build
+MYSQL_PORT=3307 PYTHON=.venv/bin/python tests/evidence/double-booking/run.sh      # and the others
+docker compose stop booking-worker      # BEFORE consumer-recovery: it runs its own worker
+MYSQL_PORT=3307 PYTHON=.venv/bin/python tests/evidence/consumer-recovery/run.sh
+docker compose start booking-worker
+```
+
+The scripts still need a Python with the shared library's packages (`services/README.md`, "First time").
+Adding the ports file to a running stack recreates Kafka and the databases; give the services a minute to
+reconnect before the first script (a booking request right after can time out once).
+
 ## The scripts
 
 | Script | Spec | What it does | `PASS` means |

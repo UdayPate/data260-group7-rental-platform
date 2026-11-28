@@ -70,11 +70,13 @@ def restore_price() -> bool:
     return call(PROPERTY_API, "/properties/update", {"property_id": "p_001", "host_id": maya["id"], "nightly_price": old_price}, token)[0] == 200
 
 
-def docker_compose(*args: str) -> bool:
+def docker_compose(action: str, _service: str = "redis") -> bool:
+    """Stop or start the Redis container. By its container name (xenia-redis), so it works with both
+    infra/docker-compose.yml and the all-in-Docker docker-compose.yml at the repo root."""
     docker = shutil.which("docker")
     if not docker:
         return False
-    done = subprocess.run([docker, "compose", "-f", str(ROOT / "infra" / "docker-compose.yml"), *args], capture_output=True, text=True)
+    done = subprocess.run([docker, action, "xenia-redis"], capture_output=True, text=True)
     return done.returncode == 0
 
 

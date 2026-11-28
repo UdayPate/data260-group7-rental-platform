@@ -1,0 +1,15 @@
+# What the Python service images never need (their build context is the repo root).
+# The frontend image uses frontend/ as its context, with its own frontend/.dockerignore.
+.git
+.secrets
+**/.env
+**/.env.*
+!**/.env.example
+**/__pycache__
+**/*.egg-info
+**/.venv
+**/node_modules
+frontend
+docs
+logs
+tests/evidence/**/worker.log
