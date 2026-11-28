@@ -1,7 +1,7 @@
 """The daily job (contract section 5 rule 6): finished stays become `completed`, unanswered requests expire.
 
-  approved, check_out <= today (UTC)  ->  completed  + booking.completed
-  pending,  check_in  <  today (UTC)  ->  declined ("Expired: ...") + its nights released + booking.declined / availability.released
+  approved, check_out <= today (America/Los_Angeles)  ->  completed  + booking.completed
+  pending,  check_in  <  today (America/Los_Angeles)  ->  declined ("Expired: ...") + its nights released + booking.declined / availability.released
 Each change is a conditional UPDATE (WHERE status = what we read), so two copies running at once cannot apply it twice.
 Run by hand:  python -m booking_service.jobs
 """
@@ -13,7 +13,7 @@ from typing import Any
 
 from xenia_shared.config import env_int, load_env
 from xenia_shared.db import Database, fetch_all, get_db
-from xenia_shared.timeutil import today_utc
+from xenia_shared.timeutil import seconds_until_local_midnight, today_local
 
 from . import core, models, repository
 
@@ -23,7 +23,7 @@ ACTOR = "booking-job"
 
 def run_daily_job(db: Database | None = None) -> dict[str, int]:
     db = db or get_db()
-    today = today_utc()
+    today = today_local()
     with db.connection() as conn:
         finished = [r["reservation_id"] for r in fetch_all(conn, "SELECT reservation_id FROM reservations WHERE status = 'approved' AND check_out <= %s ORDER BY reservation_id", (today,))]
         stale = [r["reservation_id"] for r in fetch_all(conn, "SELECT reservation_id FROM reservations WHERE status = 'pending' AND check_in < %s ORDER BY reservation_id", (today,))]
@@ -57,7 +57,8 @@ def _expire(db: Database, reservation_id: str) -> int:
 
 
 def start_daily_job(stop: threading.Event) -> threading.Thread:
-    """Run the job now (so a demo does not wait for midnight) and then every DAILY_JOB_INTERVAL_SECONDS."""
+    """Run the job now (so a demo does not wait for midnight), then again just after each midnight in
+    America/Los_Angeles (when "today" changes), or after DAILY_JOB_INTERVAL_SECONDS if that comes first."""
     interval = env_int("DAILY_JOB_INTERVAL_SECONDS", 86400)
 
     def loop() -> None:
@@ -66,7 +67,7 @@ def start_daily_job(stop: threading.Event) -> threading.Thread:
                 run_daily_job()
             except Exception:  # noqa: BLE001  (a database hiccup must not kill the worker; try again next time)
                 log.exception("daily job failed")
-            stop.wait(interval)
+            stop.wait(min(interval, seconds_until_local_midnight() + 5))  # +5 s: safely past midnight
 
     thread = threading.Thread(target=loop, name="daily-job", daemon=True)
     thread.start()

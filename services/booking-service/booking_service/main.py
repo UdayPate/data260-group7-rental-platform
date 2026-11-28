@@ -20,7 +20,7 @@ from xenia_shared.config import env_flag, load_env
 from xenia_shared.db import execute, get_db, is_duplicate_key
 from xenia_shared.errors import ApiError
 from xenia_shared.kafka import KafkaUnavailable
-from xenia_shared.timeutil import today_utc
+from xenia_shared.timeutil import today_local
 from xenia_shared.validation import is_int, is_valid_date, json_body, require_fields, to_date
 
 from . import core, models, repository
@@ -57,7 +57,7 @@ def bookings_request(_claims=Depends(require(["guest"], own=["guest_id"])), body
         return again
     if not is_valid_date(body["check_in"]) or not is_valid_date(body["check_out"]):
         raise ApiError("VALIDATION_ERROR", "Dates must be real dates in YYYY-MM-DD format.")
-    if body["check_in"] < today_utc().isoformat():
+    if body["check_in"] < today_local().isoformat():
         raise ApiError("VALIDATION_ERROR", "Check-in can’t be in the past.")
     if body["check_out"] <= body["check_in"]:
         raise ApiError("VALIDATION_ERROR", "Check-out must be after check-in.")
@@ -127,6 +127,8 @@ def _may_read_reservation(claims: Claims, body: dict[str, Any], _request) -> str
             return None  # the endpoint answers 404
         if claims.role == "guest":
             return None if row["guest_id"] == claims.sub else "You can only see your own reservations."
+        if row["status"] in models.HIDDEN_FROM_HOST:
+            return None  # the endpoint answers 404: to a host, a processing or failed request doesn't exist
         return None if repository.host_of_property(conn, row["property_id"]) == claims.sub else "Only the host of this listing can see this reservation."
 
 
@@ -144,11 +146,12 @@ def _status_filter(body: dict[str, Any]) -> str | None:
 
 
 @app.post("/bookings/get")
-def bookings_get(_claims=Depends(require(["guest", "host"], check=_may_read_reservation)), body: dict[str, Any] = Depends(json_body)):
+def bookings_get(claims: Claims = Depends(require(["guest", "host"], check=_may_read_reservation)), body: dict[str, Any] = Depends(json_body)):
     require_fields(body, ["reservation_id"])
     with get_db().connection() as conn:
         row = repository.get_reservation(conn, body["reservation_id"])
-    if row is None:
+    # The host never sees `processing` or `failed` requests (contract), not even by id: same 404 as an unknown id.
+    if row is None or (claims.role == "host" and row["status"] in models.HIDDEN_FROM_HOST):
         raise reservation_not_found(body["reservation_id"])
     return models.reservation_json(row)
 
@@ -273,7 +276,7 @@ def bookings_cancel(_claims=Depends(require(["guest", "host"], own=["guest_id", 
             if reason == "":
                 raise ApiError("VALIDATION_ERROR", "Please give the guest a reason for cancelling.")
             actor = body["host_id"]
-        if repository.as_date(row["check_in"]) <= today_utc():  # "before the check-in day", judged in UTC
+        if repository.as_date(row["check_in"]) <= today_local():  # "before the check-in day", judged in America/Los_Angeles
             raise ApiError("INVALID_STATUS", "Reservations can only be cancelled before the check-in day.")
         repository.change_status(conn, row, "cancelled", actor, reason or None)
         block = core.release(conn, row)

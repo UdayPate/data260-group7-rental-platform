@@ -12,7 +12,7 @@ from xenia_shared.cache import SearchCache
 from xenia_shared.db import fetch_all, fetch_one, get_db
 from xenia_shared.envelope import make_envelope
 from xenia_shared.kafka import Record, process_record
-from xenia_shared.timeutil import today_utc
+from xenia_shared.timeutil import today_local
 
 from property_service import consumers
 from property_service.main import app
@@ -44,11 +44,11 @@ def ids(response):
 
 def day(offset):
     """A date `offset` days after a point ~14 months ahead, far beyond every block and stay in the seed data."""
-    return (today_utc() + timedelta(days=400 + offset)).isoformat()
+    return (today_local() + timedelta(days=400 + offset)).isoformat()
 
 
 def real_day(offset):
-    return (today_utc() + timedelta(days=offset)).isoformat()
+    return (today_local() + timedelta(days=offset)).isoformat()
 
 
 # ------------------------------------------------------------ step 5: search
@@ -223,7 +223,7 @@ def test_owner_and_rating_cannot_be_changed_by_update(client):
 
 def test_delete_refused_with_upcoming_reservations(client):
     with get_db().connection() as conn:
-        busy = fetch_all(conn, "SELECT DISTINCT r.property_id, p.host_id FROM reservations r JOIN properties p USING (property_id) WHERE r.status IN ('pending','approved') AND r.check_out > UTC_DATE()")
+        busy = fetch_all(conn, "SELECT DISTINCT r.property_id, p.host_id FROM reservations r JOIN properties p USING (property_id) WHERE r.status IN ('pending','approved') AND r.check_out > %s", (today_local(),))
     assert busy, "the seed has upcoming stays"
     row = busy[0]
     response = client.post("/properties/delete", json={"property_id": row["property_id"], "host_id": row["host_id"]}, headers=auth(row["host_id"], "host"))
@@ -271,9 +271,9 @@ def test_block_that_overlaps_is_a_409_naming_the_clash(client):
 
 def test_block_over_a_reservation_is_a_409(client):
     with get_db().connection() as conn:
-        held = fetch_one(conn, "SELECT b.*, p.host_id FROM availability_blocks b JOIN properties p USING (property_id) WHERE b.source = 'booking' AND b.end_date > UTC_DATE() LIMIT 1")
+        held = fetch_one(conn, "SELECT b.*, p.host_id FROM availability_blocks b JOIN properties p USING (property_id) WHERE b.source = 'booking' AND b.end_date > %s LIMIT 1", (today_local(),))
     assert held, "seed has a booking block"
-    start = max(held["start_date"], today_utc())
+    start = max(held["start_date"], today_local())
     response = client.post("/properties/availability", json={"action": "block", "property_id": held["property_id"], "host_id": held["host_id"], "start_date": start.isoformat(), "end_date": (start + timedelta(days=1)).isoformat()}, headers=auth(held["host_id"], "host"))
     assert response.status_code == 409 and error(response)["details"]["availability_id"] == held["availability_id"]
     assert "reservation" in error(response)["message"]

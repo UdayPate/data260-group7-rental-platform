@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from xenia_shared.db import Database, execute, fetch_all, fetch_one
+from xenia_shared.timeutil import today_local
 
 GUEST_SELECT = """
 SELECT g.*,
@@ -70,8 +71,8 @@ def upcoming_reservation_ids_for_guest(conn, guest_id: str) -> list[str]:
     rows = fetch_all(
         conn,
         "SELECT reservation_id FROM reservations WHERE guest_id = %s AND status IN ('processing','pending','approved') "
-        "AND check_out > UTC_DATE() ORDER BY reservation_id",
-        (guest_id,),
+        "AND check_out > %s ORDER BY reservation_id",
+        (guest_id, today_local()),  # "upcoming" = check-out after today in America/Los_Angeles
     )
     return [r["reservation_id"] for r in rows]
 
@@ -116,8 +117,8 @@ def insert_host(conn, db: Database, body: dict[str, Any]) -> str:
     execute(
         conn,
         "INSERT INTO hosts (host_id, name, email, phone, profile_photo_url, verification_status, response_rate, response_time, host_since, access_level) "
-        "VALUES (%s, %s, %s, %s, %s, 'unverified', 0, 0, UTC_DATE(), 'standard')",
-        (host_id, body["name"], body["email"], body.get("phone") or "", body.get("profile_photo_url") or ""),
+        "VALUES (%s, %s, %s, %s, %s, 'unverified', 0, 0, %s, 'standard')",
+        (host_id, body["name"], body["email"], body.get("phone") or "", body.get("profile_photo_url") or "", today_local()),
     )
     return host_id
 

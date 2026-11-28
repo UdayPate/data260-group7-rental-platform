@@ -24,7 +24,7 @@ from xenia_shared.db import get_db, is_duplicate_key
 from xenia_shared.envelope import make_envelope
 from xenia_shared.errors import ApiError
 from xenia_shared.kafka import KafkaUnavailable, publish
-from xenia_shared.timeutil import today_utc, utc_now
+from xenia_shared.timeutil import today_local, utc_now
 from xenia_shared.validation import check_paging, is_int, is_number, is_valid_date, json_body, paged, require_fields, to_date
 
 from . import consumers, models, repository
@@ -283,7 +283,7 @@ def _block(db, prop: dict[str, Any], body: dict[str, Any], start, end) -> Any:
 
     if prop["host_id"] != body["host_id"]:
         raise not_owner("change the calendar of")
-    if start < today_utc():
+    if start < today_local():
         raise ApiError("VALIDATION_ERROR", "You can’t block dates in the past.")
     availability_id = db.next_id("a")
     try:

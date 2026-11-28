@@ -23,6 +23,7 @@ Covered so far: **User**, **Property**, **Booking**, **Messaging**, **Review**, 
 | IDs | **Strings**, never numbers. Format: prefix + `_` + number, e.g. `"g_001"`, `"h_004"`, `"p_014"`, `"r_025"`, `"a_007"`. Prefixes: `g` guest, `h` host, `p` property, `r` reservation, `a` availability block, `t` thread, `m` message, `v` review. The frontend only compares IDs as opaque strings, so UUID strings would also work. |
 | Dates | `"YYYY-MM-DD"` string, e.g. `"2026-12-04"` |
 | Datetimes | ISO 8601 in UTC with `Z`, e.g. `"2026-11-23T18:05:09Z"` |
+| Calendar "today" | Calendar dates ("today", the check-in and check-out rules, the cancel cutoff, the daily job) are judged in **America/Los_Angeles**, the same day the guest's browser shows. Timestamps stay UTC. |
 | Money | JSON number of **US dollars** (not cents), e.g. `212.5` |
 | Stay dates | `check_out` / `end_date` are **exclusive**: the guest leaves that day. Check-in 12-04 to check-out 12-06 = 2 nights (the 4th and 5th). Two stays overlap only if `a_start < b_end && b_start < a_end`, so back-to-back stays (one checks out the day the next checks in) are allowed. |
 | Nullable fields | Sent as `null`, never left out |

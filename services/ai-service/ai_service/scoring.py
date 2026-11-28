@@ -15,7 +15,7 @@ import re
 from datetime import date, timedelta
 from typing import Any
 
-from xenia_shared.timeutil import today_utc
+from xenia_shared.timeutil import today_local
 
 from .listings import Snapshot
 
@@ -43,7 +43,7 @@ def fmt(n: Any) -> str:
 
 
 def days_from_today(days: int) -> str:
-    return (today_utc() + timedelta(days=days)).isoformat()
+    return (today_local() + timedelta(days=days)).isoformat()
 
 
 def nights_between(start: str, end: str) -> int:

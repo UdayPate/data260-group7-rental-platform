@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any
 
 from xenia_shared.db import Database, execute, fetch_all, fetch_one
+from xenia_shared.timeutil import today_local
 
 from .models import EDITABLE
 
@@ -51,8 +52,8 @@ def upcoming_reservation_ids_for_property(conn, property_id: str) -> list[str]:
     rows = fetch_all(
         conn,
         "SELECT reservation_id FROM reservations WHERE property_id = %s AND status IN ('processing','pending','approved') "
-        "AND check_out > UTC_DATE() ORDER BY reservation_id",
-        (property_id,),
+        "AND check_out > %s ORDER BY reservation_id",
+        (property_id, today_local()),  # "upcoming" = check-out after today in America/Los_Angeles
     )
     return [r["reservation_id"] for r in rows]
 

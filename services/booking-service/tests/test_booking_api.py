@@ -11,7 +11,7 @@ from xenia_shared import kafka as kafka_module
 from xenia_shared.auth import sign_token
 from xenia_shared.db import execute, fetch_all, fetch_one, get_db
 from xenia_shared.kafka import Record, process_record
-from xenia_shared.timeutil import today_utc
+from xenia_shared.timeutil import today_local
 
 from booking_service import jobs, worker
 from booking_service.main import app
@@ -28,11 +28,11 @@ def auth(user_id, role):
 
 def day(offset):
     """Far enough ahead (about 14 months) to avoid every stay in the seed data."""
-    return (today_utc() + timedelta(days=400 + offset)).isoformat()
+    return (today_local() + timedelta(days=400 + offset)).isoformat()
 
 
 def real_day(offset):
-    return (today_utc() + timedelta(days=offset)).isoformat()
+    return (today_local() + timedelta(days=offset)).isoformat()
 
 
 def error(response):
@@ -133,7 +133,7 @@ def test_overlapping_request_fails_with_date_conflict(client, kafka):
 def test_a_host_block_makes_a_request_fail(client, kafka):
     from xenia_shared.availability import insert_block
     with get_db().transaction() as conn:
-        insert_block(conn, "a_900", "p_005", today_utc() + timedelta(days=400 + 30), today_utc() + timedelta(days=400 + 33), "blocked", "host")
+        insert_block(conn, "a_900", "p_005", today_local() + timedelta(days=400 + 30), today_local() + timedelta(days=400 + 33), "blocked", "host")
     r = request(client, start=31, end=32).json()
     drain(kafka)
     assert get(client, r["reservation_id"]).json()["failure_code"] == "DATE_CONFLICT"
@@ -410,7 +410,7 @@ def test_every_rule_returns_its_code(client, kafka):
 def test_cancel_only_before_the_check_in_day(client, kafka):
     # a stay that starts today: the seed's pending/approved ones are in the future, so make one
     with get_db().transaction() as conn:
-        execute(conn, "INSERT INTO reservations SELECT 'r_800', %s, 'p_010', 'g_001', UTC_DATE(), UTC_DATE() + INTERVAL 2 DAY, 1, 2, 89, 178, 20, 198, UTC_TIMESTAMP(3), 'approved', NULL, NULL, NULL, UTC_TIMESTAMP(3)", (str(uuid.uuid4()),))
+        execute(conn, "INSERT INTO reservations SELECT 'r_800', %s, 'p_010', 'g_001', %s, %s + INTERVAL 2 DAY, 1, 2, 89, 178, 20, 198, UTC_TIMESTAMP(3), 'approved', NULL, NULL, NULL, UTC_TIMESTAMP(3)", (str(uuid.uuid4()), today_local(), today_local()))
     for who, extra in ((("g_001", "guest"), {"guest_id": "g_001"}), (("h_007", "host"), {"host_id": "h_007", "cancellation_reason": "x"})):
         late = act(client, "cancel", {"reservation_id": "r_800", **extra}, who)
         assert late.status_code == 409 and "before the check-in day" in error(late)["message"]
@@ -452,18 +452,18 @@ def insert_stay(rid, prop, guest, start, end, status):
 
 
 def test_daily_job_completes_finished_stays_and_expires_stale_requests(client, kafka):
-    insert_stay("r_810", "p_010", "g_001", today_utc() - timedelta(days=3), today_utc() - timedelta(days=1), "approved")
-    insert_stay("r_811", "p_010", "g_002", today_utc() - timedelta(days=1), today_utc(), "approved")             # check-out today: finished
-    insert_stay("r_812", "p_020", "g_003", today_utc() + timedelta(days=1), today_utc() + timedelta(days=3), "approved")   # future: untouched
-    insert_stay("r_813", "p_021", "g_004", today_utc() - timedelta(days=2), today_utc() + timedelta(days=1), "pending")    # check-in passed, host never answered
-    insert_stay("r_814", "p_022", "g_005", today_utc() + timedelta(days=5), today_utc() + timedelta(days=6), "pending")    # future: untouched
+    insert_stay("r_810", "p_010", "g_001", today_local() - timedelta(days=3), today_local() - timedelta(days=1), "approved")
+    insert_stay("r_811", "p_010", "g_002", today_local() - timedelta(days=1), today_local(), "approved")             # check-out today: finished
+    insert_stay("r_812", "p_020", "g_003", today_local() + timedelta(days=1), today_local() + timedelta(days=3), "approved")   # future: untouched
+    insert_stay("r_813", "p_021", "g_004", today_local() - timedelta(days=2), today_local() + timedelta(days=1), "pending")    # check-in passed, host never answered
+    insert_stay("r_814", "p_022", "g_005", today_local() + timedelta(days=5), today_local() + timedelta(days=6), "pending")    # future: untouched
     first = jobs.run_daily_job()
     assert first == {"completed": 2, "expired": 1}
     assert jobs.run_daily_job() == {"completed": 0, "expired": 0}                                       # running again changes nothing
     with get_db().connection() as conn:
         status = {r["reservation_id"]: r for r in fetch_all(conn, "SELECT reservation_id, status, cancellation_reason FROM reservations WHERE reservation_id IN ('r_810','r_811','r_812','r_813','r_814')")}
         assert fetch_one(conn, "SELECT COUNT(*) AS n FROM availability_blocks WHERE reservation_id = 'r_813'")["n"] == 0
-        assert fetch_one(conn, "SELECT COUNT(*) AS n FROM availability_nights WHERE property_id='p_021' AND night_date = UTC_DATE()")["n"] == 0
+        assert fetch_one(conn, "SELECT COUNT(*) AS n FROM availability_nights WHERE property_id='p_021' AND night_date = %s", (today_local(),))["n"] == 0
     assert [status[k]["status"] for k in ("r_810", "r_811", "r_812", "r_813", "r_814")] == ["completed", "completed", "approved", "declined", "pending"]
     assert status["r_813"]["cancellation_reason"] == "Expired: the host didn’t respond before check-in."
     assert len(kafka.messages("booking.completed")) == 2 and len(kafka.messages("booking.declined")) == 1
@@ -473,7 +473,7 @@ def test_daily_job_completes_finished_stays_and_expires_stale_requests(client, k
 
 
 def test_two_jobs_at_the_same_moment_do_not_double_apply(client, kafka):
-    insert_stay("r_820", "p_010", "g_001", today_utc() - timedelta(days=3), today_utc() - timedelta(days=1), "approved")
+    insert_stay("r_820", "p_010", "g_001", today_local() - timedelta(days=3), today_local() - timedelta(days=1), "approved")
     totals, barrier = [], threading.Barrier(2)
 
     def go():
@@ -488,3 +488,32 @@ def test_two_jobs_at_the_same_moment_do_not_double_apply(client, kafka):
 
 def test_health_and_cors(client):
     assert client.get("/health").json() == {"status": "ok", "service": "booking-service"}
+
+
+def test_a_host_opening_a_processing_or_failed_request_by_id_gets_404(client, kafka):
+    """The host never sees processing or failed requests: not in lists, and by id the same 404 as an unknown id."""
+    processing = request(client, "g_006", start=120, end=122).json()["reservation_id"]
+    hidden = get(client, processing, MAYA)
+    assert hidden.status_code == 404 and error(hidden)["message"] == f"No reservation found with id {processing}."
+    request(client, "g_007", start=130, end=132)                       # first: gets the nights
+    failed = request(client, "g_008", start=130, end=132).json()["reservation_id"]
+    drain(kafka)
+    assert get(client, failed, ("g_008", "guest")).json()["status"] == "failed"   # the guest still sees it
+    assert get(client, failed, MAYA).status_code == 404
+    assert get(client, processing, MAYA).status_code == 200                       # now pending: the host sees it
+
+
+def test_at_6_pm_pacific_booking_today_is_allowed(client, kafka, monkeypatch):
+    """Calendar dates are judged in America/Los_Angeles (contract section 1). At 6 pm Pacific on Nov 30 it is
+    already Dec 1 in UTC; a guest booking Nov 30 (their today) must be accepted, and Nov 29 refused."""
+    from datetime import datetime, timezone
+
+    from xenia_shared import timeutil
+
+    six_pm_pacific = datetime(2026, 12, 1, 2, 0, tzinfo=timezone.utc)   # = 2026-11-30 18:00 PST
+    monkeypatch.setattr(timeutil, "utc_now", lambda: six_pm_pacific)
+    body = {"property_id": "p_005", "guest_id": "g_009", "guest_count": 2}
+    today = client.post("/bookings/request", json={**body, "check_in": "2026-11-30", "check_out": "2026-12-02", "idempotency_key": str(uuid.uuid4())}, headers=auth("g_009", "guest"))
+    assert today.status_code == 202 and today.json()["status"] == "processing"
+    yesterday = client.post("/bookings/request", json={**body, "check_in": "2026-11-29", "check_out": "2026-12-02", "idempotency_key": str(uuid.uuid4())}, headers=auth("g_009", "guest"))
+    assert yesterday.status_code == 400 and "past" in error(yesterday)["message"]

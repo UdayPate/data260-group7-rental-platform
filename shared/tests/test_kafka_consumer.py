@@ -158,3 +158,34 @@ def test_same_key_goes_to_the_same_partition_and_unknown_topics_are_refused():
     assert len(populated) == 1                                 # all of one trace on one partition (spec 13.11)
     with pytest.raises(Exception):
         broker.produce("typo.topic", "k", b"{}")
+
+
+def test_a_failure_outside_the_handler_retries_the_message_instead_of_skipping_it(kafka, monkeypatch):
+    """If something fails after a message is taken (e.g. the offset commit), run_consumer reconnects and gets
+    the SAME message again. Without that, the next message's commit would move past it and it would be lost."""
+    import xenia_shared.kafka as kafka_module
+
+    real_process_record = kafka_module.process_record
+    failed_once = []
+
+    def flaky_process_record(record, *args, **kwargs):
+        if not failed_once:
+            failed_once.append(record.offset)
+            raise RuntimeError("offset commit failed")  # nothing handled, nothing committed
+        return real_process_record(record, *args, **kwargs)
+
+    monkeypatch.setattr(kafka_module, "process_record", flaky_process_record)
+    handled = []
+    stop = threading.Event()
+    thread = threading.Thread(target=run_consumer, args=(["booking.requested"], "retry-loop", lambda e, c: handled.append(e["idempotency_key"]), "svc"), kwargs={"stop": stop, "poll_seconds": 0.05}, daemon=True)
+    thread.start()
+    publish("booking.requested", envelope("first"), key="p_001")   # same key: same partition, in order
+    publish("booking.requested", envelope("second"), key="p_001")
+    deadline = time.time() + 5
+    while time.time() < deadline and len(handled) < 2:
+        time.sleep(0.02)
+    stop.set()
+    thread.join(3)
+    assert failed_once == [0]
+    assert handled == ["first", "second"]                     # the failed one came back, in order
+    assert kafka.lag("retry-loop", "booking.requested") == 0

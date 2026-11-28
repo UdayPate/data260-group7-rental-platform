@@ -17,7 +17,7 @@ import logging
 import time
 from typing import Any
 
-from xenia_shared.timeutil import today_utc
+from xenia_shared.timeutil import today_local
 
 from . import llm, protocol, scoring
 from .harness import Requirements
@@ -88,7 +88,7 @@ def model_fields(raw: Any) -> dict[str, Any]:
     check_in, check_out = raw.get("check_in"), raw.get("check_out")
     try:
         if isinstance(check_in, str) and isinstance(check_out, str):
-            if today_utc().isoformat() <= check_in < check_out and scoring.nights_between(check_in, check_out) <= 30:
+            if today_local().isoformat() <= check_in < check_out and scoring.nights_between(check_in, check_out) <= 30:
                 kept["check_in"], kept["check_out"] = check_in, check_out
     except ValueError:
         pass
@@ -106,7 +106,7 @@ def parse(trace_id: str, text: str, cities: list[str]) -> dict[str, Any]:
     if fields is not None:
         llm.log_call(trace_id, "parse", tier, llm.model_name(tier), time.monotonic(), cached=True)
     else:
-        prompt = PROMPT.format(today=today_utc().isoformat(), amenities=json.dumps(scoring.AMENITIES), types=json.dumps(scoring.PROPERTY_TYPES), text=text)
+        prompt = PROMPT.format(today=today_local().isoformat(), amenities=json.dumps(scoring.AMENITIES), types=json.dumps(scoring.PROPERTY_TYPES), text=text)
         fields = model_fields(llm.extract_json(llm.complete(trace_id, "parse", tier, "You turn travel requests into JSON.", prompt)))
         llm.cache_store(text, guard, fields)
     # The model only fills gaps: anything the rules read stays as the rules read it.

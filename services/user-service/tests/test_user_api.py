@@ -3,6 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from xenia_shared.auth import sign_token
+from xenia_shared.timeutil import today_local
 from user_service.main import app
 
 
@@ -194,7 +195,7 @@ def test_guest_delete_removes_login_and_saves_but_keeps_past_reservations(client
     with fresh_db.connection() as conn, conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) AS n FROM reservations WHERE guest_id='g_005'")
         before = cur.fetchone()["n"]
-        cur.execute("SELECT COUNT(*) AS n FROM reservations WHERE guest_id='g_005' AND status IN ('pending','approved') AND check_out > UTC_DATE()")
+        cur.execute("SELECT COUNT(*) AS n FROM reservations WHERE guest_id='g_005' AND status IN ('pending','approved') AND check_out > %s", (today_local(),))
         assert cur.fetchone()["n"] == 0                          # g_005 can be deleted
     response = client.post("/guests/delete", json={"guest_id": "g_005"}, headers=auth("g_005", "guest"))
     assert response.status_code == 200 and response.json() == {"guest_id": "g_005", "deleted": True}

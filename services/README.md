@@ -42,5 +42,5 @@ VITE_BOOKING_API_BASE_URL=http://localhost:8003
 ## Contract points worth knowing
 
 - `docs/api/data-contract.md` is the source of truth; the mocks in `frontend/src/mocks/handlers` are the reference for messages and edge cases.
-- Dates are UTC. End dates are exclusive (a stay 12-04 to 12-06 holds nights 12-04 and 12-05).
+- Timestamps are UTC; calendar dates ("today", check-in rules, the cancel cutoff, the daily job) are judged in America/Los_Angeles (`today_local()` in `shared/xenia_shared/timeutil.py`). End dates are exclusive (a stay 12-04 to 12-06 holds nights 12-04 and 12-05).
 - Double booking is prevented by MySQL: `availability_nights` has `PRIMARY KEY (property_id, night_date)`.

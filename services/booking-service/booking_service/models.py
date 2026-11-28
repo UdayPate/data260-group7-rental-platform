@@ -8,6 +8,7 @@ from xenia_shared.db import jsonable, number
 
 STATUSES = ["processing", "pending", "approved", "declined", "cancelled", "completed", "failed"]
 HOLDING = ("pending", "approved")  # these statuses hold the dates (contract section 5 rule 1)
+HIDDEN_FROM_HOST = ("processing", "failed")  # the host never sees these: not in lists, 404 by id (contract)
 
 DATE_CONFLICT_TEXT = "Some of these dates are no longer available. Please pick other dates."
 EXPIRED_TEXT = "Expired: the host didn’t respond before check-in."

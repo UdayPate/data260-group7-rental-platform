@@ -10,6 +10,8 @@ The rules this file enforces for EVERY message (spec 6.2, 10, 13.2):
                     2. run the handler; transient failures (deadlock, DB briefly down) are retried
                        with bounded exponential backoff (1 s, 2 s, 4 s), then dead-lettered
                     3. commit the Kafka offset ONLY AFTER the handler's database transaction committed
+                  If anything fails after that (even the offset commit), run_consumer() reconnects, so the
+                  message is delivered again from the last committed offset instead of being skipped.
 
 Why that order: Kafka delivers "at least once". If the worker dies after the database write but
 before the offset commit, the message comes again. The processed_events row, written in the SAME
@@ -517,21 +519,33 @@ def run_consumer(
     """
     transport = transport or get_transport()
     stop = stop or threading.Event()
-    consumer = transport.consumer(topics, group, offset_reset)
+    consumer: TransportConsumer | None = transport.consumer(topics, group, offset_reset)
     log.info("consumer group '%s' started on %s", group, topics)
     try:
-        while not stop.is_set():
+        while not stop.is_set() and consumer is not None:
             record = consumer.poll(poll_seconds)
             if record is None:
                 continue
             try:
                 process_record(record, group, handler, service, db, transport, consumer.commit)
             except Exception:  # noqa: BLE001
-                # Never kill the loop. The offset was not committed, so the message comes again.
-                log.exception("consumer '%s' failed on %s:%s:%s", group, record.topic, record.partition, record.offset)
-                time.sleep(1)
+                # Something failed outside the handler's own retries (e.g. the offset commit itself), so this
+                # message's offset may not be committed. Just polling on would hand us the NEXT message, and
+                # committing that one would skip this one. So: close the consumer and join the group again,
+                # which restarts from the last COMMITTED offset and delivers this message again. If its
+                # database change did commit, the processed_events row turns the repeat into a no-op.
+                log.exception("consumer '%s' failed on %s:%s:%s; reconnecting to retry it", group, record.topic, record.partition, record.offset)
+                consumer.close()
+                consumer = None
+                while consumer is None and not stop.is_set():  # the broker may be down too: keep trying
+                    time.sleep(1)
+                    try:
+                        consumer = transport.consumer(topics, group, offset_reset)
+                    except Exception:  # noqa: BLE001
+                        log.exception("consumer '%s' could not reconnect; trying again", group)
     finally:
-        consumer.close()
+        if consumer is not None:
+            consumer.close()
         log.info("consumer group '%s' stopped", group)
 
 
